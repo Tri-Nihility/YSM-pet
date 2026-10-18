@@ -17,6 +17,18 @@ import time
 os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
 os.environ.setdefault("OMP_NUM_THREADS", "1")
 
+# ⚠️ 控制台编码兜底：非中文 Windows 的默认编码是 cp1252 / cp437，里面装不下中文，
+#    而本脚本满屏中文提示（加载进度、待机策略…），Python 默认 strict 报错 →
+#    一句 print 就能让桌宠启动即崩 UnicodeEncodeError。
+#    统一改成 UTF-8 + errors=replace：中文区显示正常，别的区最多显示为乱码，
+#    但**绝不崩**。（为什么要这样补：PYTHONUTF8 必须在解释器启动前才生效，
+#    在脚本里改 os.environ 已经晚了，只能直接 reconfigure 流。）
+for _s in (sys.stdout, sys.stderr):
+    try:
+        _s.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:                                        # noqa: BLE001
+        pass
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.join(ROOT, "src"))

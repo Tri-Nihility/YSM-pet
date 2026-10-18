@@ -10,6 +10,14 @@ on:
 permissions:
   contents: write
 
+# 控制台编码：windows runner 默认 cp1252，装不下中文。桌宠的提示信息全是中文
+# （spec 的收尾日志、run_pet 的加载进度都是），不设会直接 UnicodeEncodeError。
+# 注意 PYTHONUTF8 只在解释器启动前生效，所以在这里设环境变量；
+# 运行时脚本内部另有 sys.stdout.reconfigure 兜底（防止用户在非中文 Windows 上崩）。
+env:
+  PYTHONUTF8: "1"
+  PYTHONIOENCODING: utf-8
+
 jobs:
   build:
     runs-on: windows-latest

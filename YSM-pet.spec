@@ -111,4 +111,12 @@ for _dll in ('raster.dll', 'ysmcrypt.dll', 'ysmreader.dll'):
         _dst = _os.path.join(_APP, 'native', _dll)
         _os.makedirs(_os.path.dirname(_dst), exist_ok=True)
         _shutil.copy2(_src, _dst)
-print('[spec] 已把 configs/ data/processed/ native/*.dll 复制到 exe 同级目录: %s' % _APP)
+# ⚠️ 这一行必须是 ASCII：spec 是在 PyInstaller 进程里 exec 的，输出会打到
+#    当前控制台编码。GitHub Actions 的 windows runner 默认是 cp1252，
+#    中文一 print 就是 UnicodeEncodeError: 'charmap' codec can't encode
+#    —— v0.3.0 第一次 CI 就栽在这里（包其实已经打好了，是最后的提示信息炸的）。
+_msg = '[spec] copied configs/ data/processed/ native/*.dll next to the exe: %s' % _APP
+try:
+    print(_msg)
+except UnicodeEncodeError:                       # 兜底：绝不因打印失败整个构建
+    pass
