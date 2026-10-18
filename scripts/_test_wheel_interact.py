@@ -45,11 +45,21 @@ def shot(w, name):
 
 def main():
     os.makedirs(OUT, exist_ok=True)
-    from pet import loader as L
+    from pet import modelsource as MS
     from pet.gaze import GazeTracker
     from ysm.clips import ClipLibrary
 
-    d = L.load_all()
+    # 走 modelsource（与 run_pet.py 同一条路径），别用 `loader.load_all()`
+    # —— 它默认读 data/decrypted/*.bin，那是 gitignore 掉的本机产物。
+    src = sys.argv[1] if len(sys.argv) > 1 else None
+    if not src:
+        from pet import settings as _S
+        src = _S.load().get("model")
+    if not src:
+        print("用法: python scripts/_test_wheel_interact.py "
+              "<模型来源 .ysm/文件夹/压缩包>")
+        return 2
+    d = MS.load_source(src, progress=None)
     model = d["model"]
 
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])

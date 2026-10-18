@@ -29,8 +29,8 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "src"))
 
 import numpy as np                                   # noqa: E402
-import pybullet as p                                 # noqa: E402
 
+from pet.camera import view_matrix                   # noqa: E402
 from phys.bind import P_MAT                          # noqa: E402
 from pet import settings as S                        # noqa: E402
 from pet import modelsource as MS                    # noqa: E402
@@ -48,9 +48,7 @@ def face_horiz(rot, front_yaw, cam_yaw=CAM_YAW, cam_pitch=CAM_PITCH):
     R = _euler_rot(*np.radians(rot))[:3, :3]
     dir_model = R @ P0
     dir_pb = P_MAT @ dir_model
-    vm = np.array(p.computeViewMatrixFromYawPitchRoll(
-        (0, 0, 0), 5.0, cam_yaw, cam_pitch, 0,
-        upAxisIndex=2)).reshape(4, 4).T
+    vm = view_matrix((0, 0, 0), 5.0, cam_yaw, cam_pitch)
     return float((vm[:3, :3] @ dir_pb)[0])
 
 

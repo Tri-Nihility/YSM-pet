@@ -1,0 +1,93 @@
+name: Build YSM-pet (Windows)
+
+# 推 tag 就出一版 Release；也可以 Actions 页面手动触发
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 装 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: 装依赖
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: 版本号
+        id: ver
+        shell: bash
+        run: |
+          v=$(tr -d '\r\n' < VERSION)
+          echo "ver=$v" >> "$GITHUB_OUTPUT"
+          echo "版本号: $v"
+
+      # native/*.dll 已静态链接（只依赖 KERNEL32 + msvcrt），可以在任意
+      # Windows 上直接复用，不需要在 CI 里装 MinGW 重编。
+      # 缺了也不会崩：FastRenderer 会自动退化成纯 Python 渲染。
+      - name: 确认原生 DLL 就位
+        shell: bash
+        run: |
+          for f in raster ysmcrypt ysmreader; do
+            test -f native/$f.dll && echo "  ✓ native/$f.dll" \
+              || echo "  ⚠️ 缺 native/$f.dll（会退化成纯 Python 渲染）"
+          done
+
+      - name: PyInstaller 打包
+        run: python -m PyInstaller YSM-pet.spec --noconfirm --clean
+
+      - name: 校验产物完整性
+        shell: bash
+        run: |
+          set -e
+          test -f dist/YSM-pet/YSM-pet.exe || { echo "exe 没生成"; exit 1; }
+          test -f dist/YSM-pet/configs/joints9.yaml || { echo "configs 缺失"; exit 1; }
+          test -d dist/YSM-pet/_internal || { echo "_internal 缺失"; exit 1; }
+          du -sh dist/YSM-pet
+          echo "产物 OK"
+
+      # 有没有模型都得能启动：--help 会走完 argparse，能验证打包出来的
+      # Python 运行时 + 依赖打包完整（漏东西在这里就崩了，不会拖到 Release）。
+      - name: 冒烟（ --help ）
+        shell: bash
+        run: |
+          ./dist/YSM-pet/YSM-pet.exe --help
+
+      - name: 压缩 Release 包
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path out | Out-Null
+          $zip = "out/YSM-pet-${{ steps.ver.outputs.ver }}-win64.zip"
+          Compress-Archive -Path "dist/YSM-pet/*" -DestinationPath $zip
+          Get-Item $zip | Select-Object Name, @{n='MB';e={[math]::Round($_.Length/1MB,1)}}
+
+      - name: 上传构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: YSM-pet-win64
+          path: out/*.zip
+          if-no-files-found: error
+
+      - name: 发布到 Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: out/*.zip
+          name: "YSM-pet ${{ steps.ver.outputs.ver }}"
+          generate_release_notes: true

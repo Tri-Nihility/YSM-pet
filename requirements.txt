@@ -1,18 +1,22 @@
 # YSM-pet 依赖清单
 #
-# 桌宠运行必需（源码方式跑才需要；打包版已内置，无需安装）：
+# 桌宠运行必需（源码方式跑才需要；GitHub Release 里的打包版已内置，无需安装）：
 #   PySide6      窗口 / 渲染呈现
-#   numpy scipy  几何与矩阵
-#   pyyaml       配置
+#   numpy scipy  几何与矩阵运算
+#   pyyaml       configs/joints9.yaml
 #   tqdm         进度条
 #   Pillow       贴图处理
-#   pybullet     只用它的视图/投影矩阵函数（纯矩阵数学）
-#               PyPI 无 Windows 轮子，走 conda-forge：
-#               conda install -y --override-channels -c conda-forge pybullet
+#   py7zr        .7z 格式的模型压缩包（缺少会静默降级到系统 tar，不够稳）
+#   PyInstaller  仅本地打包 exe 时需要（CI 里另行安装）
 #
-# 训练线遗产（src/env、src/train、scripts/train.py 才需要，桌宠不经过）：
-#   torch==2.14.1+cpu    仅 CPU 版，别被换成 CUDA 版
-#   matplotlib           训练曲线
+# ⚠️ 已从旧版 YSM-Motion 移除的两个依赖，别再捡回来：
+#   torch    训练线遗产。桌宠是纯动画播放器，一行 torch 都不用，
+#            带上会让打包产物从 ~200MB 膨胀到 ~2GB。
+#   pybullet 只为两个相机矩阵函数服务（computeViewMatrixFromYawPitchRoll /
+#            computeProjectionMatrixFOV），已被 `src/pet/camera.py` 用纯
+#            numpy 复刻（数值已对齐到 1e-7）。移除它的关键原因：
+#            **pybullet 在 PyPI 上没有 Windows 轮子**，`pip install pybullet`
+#            会退回源码构建并失败 —— CI 根本装不上。
 
 PySide6
 numpy
@@ -20,4 +24,4 @@ scipy
 pyyaml
 tqdm
 Pillow
-pybullet
+py7zr

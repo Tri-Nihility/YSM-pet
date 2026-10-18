@@ -29,7 +29,15 @@ def check(name, cond, detail=""):
 
 
 print("===== 1) ONCE 动画播完交还待机（穿模消失 bug） =====")
-data = MS.load_source(os.path.join(ROOT, "临时文件（记得整理掉/亚托莉（目标模型）.ysm"))
+_src = (sys.argv[1] if len(sys.argv) > 1 else None)
+if not _src:
+    from pet import settings as _S
+    _src = _S.load().get("model")
+if not _src:
+    print("用法: python scripts/_test_orient_cache_fix.py "
+          "<模型来源 .ysm/文件夹/压缩包>")
+    raise SystemExit(2)
+data = MS.load_source(_src)
 model, tex, hide = data["model"], data["tex"], data["hide"]
 fr = FastRenderer(model, tex, hide_bones=hide)
 fr.ssaa = 1

@@ -99,6 +99,26 @@ print("\n3) 开启穿透后用【全局热键 Ctrl+Alt+P】关闭")
 w.toggle_click_through(True)
 app.processEvents()
 check("前置：已开启", thru_flag())
+
+# ⚠️ 热键走的是真 Win32 消息投递：`PostMessageW(WM_HOTKEY, ...)` 必须有一个
+#    真实的 HWND。offscreen 平台下热键宿主窗口拿不到句柄（_hwnd=0），投递必然
+#    失败 —— 那是**平台限制，不是功能坏了**。这里明确跳过而不是报成一堆失败，
+#    避免把「环境不支持」误读成「代码有 bug」。
+if not getattr(w._hotkey, "_hwnd", 0):
+    w.toggle_click_through(False)
+    app.processEvents()
+    print("""
+⚠️ 跳过热键链路：当前是 offscreen 平台（QT_QPA_PLATFORM=offscreen），
+   热键宿主窗口没有真实 HWND，WM_HOTKEY 投递不出去。
+   该链路需要在真实桌面会话下验证：
+       QT_QPA_PLATFORM=windows python scripts/_test_click_through.py
+   前面 1)/2)（右键菜单 + 托盘菜单关闭路径）已验证通过。""")
+    print("\n结果: ⚠️ 热键链路跳过（offscreen 无真实 HWND），其余路径通过")
+    S.save(SNAP)
+    w.thread.stop()
+    w.close()
+    sys.exit(0)
+
 posted = post_hotkey()
 check("WM_HOTKEY 可投递", posted)
 check("热键已把穿透关掉", not thru_flag(),

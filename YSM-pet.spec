@@ -23,15 +23,16 @@ hiddenimports = ['pet.petapp', 'pet.modelsource', 'pet.settings',
                  # 打包环境**必须装了 py7zr**，否则它只是静默降级到
                  # libarchive（Windows 自带 tar.exe），不够稳。
                  'py7zr', 'multivolumefile', 'texttable', 'pyzstd']
-datas += collect_data_files('torch')
+# ⚠️ 打包依赖必须与 requirements.txt 对齐。**不要**把 torch / pybullet 拉进来：
+#    * torch 是训练线遗产，桌宠一行都不用，带上会让产物从 ~200MB 膨胀到 ~2GB；
+#    * pybullet 只为两个矩阵函数服务，已被 `src/pet/camera.py`（纯 numpy）取代，
+#      而且它在 PyPI 上没有 Windows 轮子 —— 放进 spec 会导致 CI 直接装不上依赖。
 datas += collect_data_files('scipy')
-binaries += collect_dynamic_libs('torch')
 binaries += collect_dynamic_libs('scipy')
 binaries += collect_dynamic_libs('numpy')
 hiddenimports += collect_submodules('pet')
 hiddenimports += collect_submodules('phys')
-tmp_ret = collect_all('pybullet')
-datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
+hiddenimports += collect_submodules('ysm')
 tmp_ret = collect_all('yaml')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 tmp_ret = collect_all('tqdm')
@@ -50,7 +51,8 @@ a = Analysis(
     hooksconfig={},
     runtime_hooks=[],
     # 不要在这里 exclude unittest / numpy.f2py：理由见文件上方 hiddenimports 的注释。
-    excludes=['tkinter', 'IPython', 'jupyter', 'pytest', 'torch.test', 'torch.utils.tensorboard', 'scipy.test', 'numpy.test'],
+    excludes=['tkinter', 'IPython', 'jupyter', 'pytest', 'scipy.test', 'numpy.test',
+              'torch', 'pybullet'],
     noarchive=False,
     optimize=0,
 )

@@ -27,7 +27,16 @@ from pet.petapp import (IdleAnimator, PetWindow,   # noqa: E402
 from pet.gaze import GazeTracker                   # noqa: E402
 from ysm.clips import ClipLibrary                  # noqa: E402
 
-SRC = os.path.join(ROOT, "临时文件（记得整理掉", "亚托莉（目标模型）.ysm")
+def _src():
+    """模型来源：命令行参数 > 上次记住的模型。
+
+    以前这里写死了另一个开发树里的临时目录 `ROOT/临时文件（记得整理掉/…`，
+    换了机器必然 FileNotFoundError —— 那属于已被清理的历史遗留。
+    """
+    return sys.argv[1] if len(sys.argv) > 1 else None
+
+
+SRC = _src()
 
 
 def dump(menu, depth=0):
@@ -52,7 +61,15 @@ def main():
         f.setFamily(fam)
         app.setFont(f)
 
-    d = MS.load_source(SRC)
+    src = SRC
+    if not src:
+        from pet import settings as _S
+        src = _S.load().get("model")
+    if not src:
+        print("用法: python scripts/_test_menu.py "
+              "<模型来源 .ysm/文件夹/压缩包>")
+        return 2
+    d = MS.load_source(src)
     fr = FastRenderer(d["model"], d["tex"], hide_bones=d["hide"])
     w = PetWindow(fr, IdleAnimator(d["model"]), rig=None, scale=1.0, fps=30,
                   gaze=GazeTracker(d["model"]), clips=ClipLibrary(d["model"]))

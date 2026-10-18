@@ -1,108 +1,99 @@
 # YSM-pet
 
-把 **YSM（Yes Steve Model）模型**变成 Windows 桌宠的小项目：透明无边框、永远置顶的
-小人贴在桌面上，播模型自带的动画，头能跟着鼠标光标转，右键弹出动画轮盘。
+把 Minecraft 的 **Yes Steve Model（YSM）模型**从游戏里搬到桌面上 —— 透明窗口、
+分层渲染、待机呼吸、视线跟踪、动画轮盘，能拖着走、戳它有反应。
 
 - 不需要 GPU，也不需要联网 —— C++ 光栅化路径下单帧约 10–25 ms（CPU 即可）；
-- 不需要 Python 也能跑 —— `YSM-pet.spec` 一条命令打出免安装的单文件夹版；
-- 模型版权归作者，**本仓库不含任何模型文件**，自己准备 `.ysm` 即可。
+- 不需要装 Python 也能跑 —— [Releases](../../releases) 里有免安装的打包版；
+- 模型版权归各自作者，**本仓库不含任何模型文件**，自己准备 `.ysm` 即可。
 
-> 📋 完整开发日志（12 篇，含每个坑的取证过程）在 `docs/`，其中
-> `docs/10-桌宠项目.md` 是主日志，`docs/11-打包版修复与重打包说明.md` 讲打包。
+---
+
+## 快速开始
+
+**不想折腾**：去 [Releases](../../releases) 下载 `YSM-pet-*.zip`，解压双击
+`YSM-pet.exe`，第一次启动选一个 `.ysm` 文件，之后就记住了。
+
+**用源码跑**：
+
+```bash
+pip install -r requirements.txt
+python scripts/run_pet.py
+```
 
 ---
 
 ## 功能
 
-| 功能 | 说明 |
-|---|---|
-| 模型加载 | `.ysm` / 文件夹 / `.zip` / `.7z` / `.rar`；解密读取走自带原生 DLL |
-| 动画播放 | 模型自带 main 组动作 + 原版 YSM 的 `pre_parallel`/`parallel` 常驻层（默认关，开着会把身体藏掉） |
-| 动画轮盘 | 右键菜单，复刻上游 `AnimationRouletteScreen` 布局（每页 8 项、45° 扇区） |
-| 清晰模式（默认开） | 只画人物本体，藏掉特效 / 立绘 / 游戏内 UI 部件（YSM 模型常把这些拆成独立根骨骼） |
-| 视线追踪（默认关） | 头跟随鼠标光标。**准确度问题已修复**，在「设置 → 视线」里手动开，或启动加 `--gaze` |
-| 程序化待机 | 呼吸 + 头部缓慢摆动 + 手臂微摆（模型没有自带动画时的兜底）。**眨眼已移除** |
-| 交互 | 拖拽移动、滚轮缩放、右键菜单、`Ctrl+Alt+P` 鼠标穿透逃生舱、托盘图标 |
-| 朝向相机 | 默认 yaw 90° / pitch 0°（正对模型侧面→正面），松手即持久化，重启恢复 |
-| 打包 | `YSM-pet.spec` → PyInstaller onedir，含 `_internal` 整包拷贝即用 |
+| 能力 | 说明 |
+| --- | --- |
+| 透明桌宠窗口 | 无边框 + 置顶 + 鼠标可穿透，拖到哪算哪 |
+| 模型自带动画 | 自动读 `.ysm` 的 `main` / `extra` 组，几十个动画的模型也吃得下 |
+| 常驻并行层 | 原版 YSM 的 `pre_parallel` / `parallel`，驱动头发裙摆飘动（面板里开） |
+| 程序化呼吸 | 模型没有自带动画时的兜底：呼吸 + 缓慢摆头 + 手臂微摆 |
+| 视线追踪 | 头和眼睛跟着鼠标光标转（默认关，需手动开启） |
+| 清晰模式 | 只画人物本体，藏掉模型里打包的特效 / 立绘 / 游戏内 UI（默认开） |
+| 动画轮盘 | 环形菜单，按作者在 `.ysm` 里排的顺序单选动画 |
+| 设置持久化 | 模型、朝向、缩放、开关都记住，重启接着用 |
 
-## 快速开始
-
-```bat
-rem 方式一：双击（自动在本机找一个装了依赖的 Python）
-run_pet.bat
-
-rem 方式二：手动指定解释器
-python scripts/run_pet.py                 :: 用上次记住的模型；没记住就弹向导
-python scripts/run_pet.py --source 模型.ysm
-python scripts/run_pet.py --gaze          :: 启动即开启视线追踪
-python scripts/run_pet.py --smoke         :: 不开窗口，只渲 3 帧存图自检
-python scripts/run_pet.py --all-parts     :: 冒烟时连特效/立绘一起画（对照用）
-```
-
-依赖（源码运行才需要；打包版不需要）：
-
-```
-PySide6  numpy  scipy  pyyaml  tqdm  Pillow  pybullet
-```
-
-`pybullet` 只用来算视图/投影矩阵（纯矩阵数学），PyPI 无 Windows 轮子，
-走 conda-forge：`conda install -y --override-channels -c conda-forge pybullet`。
-
-`run_pet.bat --list` 可以列出本机所有 Python 各自缺什么。
-
-## 桌宠操作
+### 操作
 
 | 操作 | 效果 |
-|---|---|
-| 左键拖拽 | 移动位置 |
-| 滚轮 | 缩放 |
-| 右键 | 菜单：置顶 / 穿透 / 轮盘 / 朝向复位 / 设置 / 退出 |
-| `Ctrl+Alt+P` | 鼠标穿透逃生舱（穿透开启后窗口收不到鼠标，用热键救回来） |
-| 设置面板 | 相机（朝向/缩放/SSAA/光影）、动画（待机/并行层/清晰模式）、视线、窗口 |
+| --- | --- |
+| 拖动窗口 | 移动桌宠 |
+| 滚轮 | 缩放大小 |
+| 右键 | 菜单（设置 / 动画 / 穿透 / 退出） |
+| `Ctrl+Alt+P` | 紧急关闭鼠标穿透（开了穿透后唯一的救法） |
+| 托盘图标 | 同样的菜单，窗口藏到托盘时也能操作 |
 
-## 打包（免安装版）
+### 支持的模型来源
 
-```bat
-python -m PyInstaller YSM-pet.spec --noconfirm
-rem 产物：dist\YSM-pet\YSM-pet.exe（+ _internal\），整文件夹拷贝即用
+`.ysm` 文件本身、装它的文件夹、`zip` / `7z` / `rar` 压缩包。
+贴图优先用 `.ysm` 内嵌的，找不到再退回外部 PNG。
+
+---
+
+## 构建打包版
+
+```bash
+pip install pyinstaller
+python -m PyInstaller YSM-pet.spec --noconfirm --clean
+# 产物在 dist/YSM-pet/
 ```
 
-spec 已处理三个历史上的坑：`numpy.f2py`/`unittest` 不能进 `excludes`
-（否则 scipy 导入链崩）、`configs`/`models`/`data/processed`/`native` 要同时
-放 `_internal` 和 exe 同级（模块的 ROOT 解析两种都可能）、`.7z` 需要
-`py7zr`。详见 `docs/11`。
+推送 tag 后 GitHub Actions 会自动构建 Windows 版并挂到 Release 上：
 
-原生 DLL 重建：`python scripts/build_native.py`（`raster.cpp` 光栅化 /
-`ysmcrypt.c` + `ysmreader.c` 解密读取）。
+```bash
+git tag v0.3.0 && git push origin v0.3.0
+```
+
+---
 
 ## 目录结构
 
 ```
-configs/          相机/骨架/物理/表情配置
-data/processed/   skeleton9.json（骨架绑定结果；raw/interim/decrypted 不入库）
-models/           ysm_atri_9dof.urdf（9 自由度骨架）
-native/           raster.cpp / ysmcrypt.c / ysmreader.c + 预编译 DLL
-src/
-  pet/            桌宠本体：petapp（窗口/菜单/面板）、fastrender（渲染）、
-                   gaze（视线追踪）、modelsource（模型加载）、settings（持久化）
-  ysm/            .ysm 解析、几何、动画 clip、加密读取
-  phys/ env/ train/ export/ serve/   历史训练线遗产，桌宠运行不经过
-scripts/          run_pet.py（入口）、launch_pet.ps1（run_pet.bat 的实现）、
-                  build_native.py、step1–5 数据管线、_test_*.py 回归
-web/              TypeScript 模型查看器（Vite，step5 导出目标）
-tests/            加密原语测试
-docs/             01–12 开发日志（10 = 桌宠主日志，11 = 打包，12 = 二进制格式规格）
+src/pet/      桌宠本体：窗口、渲染器、相机、视线追踪、素材加载、设置持久化
+src/ysm/      .ysm 解密 / 二进制反序列化 / 骨骼树 / 动画采样 / molang 求值
+src/phys/     坐标约定（模型空间 ↔ Z-up）
+native/       C/C++ 加速：光栅化、.ysm 解密与读取（含预编译 DLL）
+configs/      需要隐藏的骨骼清单
+scripts/      启动脚本与回归测试
 ```
+
+---
 
 ## 已知限制
 
-- `.rar` 只有 libarchive（Windows 自带 `tar.exe`）兜底，加密 / 固实 rar 不保证；
-- 「哪个根骨骼子树是人本体」用 `Head` 判定，没有 `Head` 的模型退回「骨骼最多的根」；
-- 特效/立绘的显隐是**静态**的（没有实现 molang 状态机）；
-- 训练线（站立策略）历史上未达标，与桌宠运行无关，保留在 `src/phys`、`src/env` 等目录。
+- 目前只做 Windows（`ctypes` 加载 DLL + `WA_TranslucentBackground` 分层窗口）。
+- **常驻并行层默认关闭**：游戏里这两层由玩家状态 molang 驱动（护甲 / 箭矢 /
+  HUD…），桌宠没有那套变量，全开有可能把身体藏掉。想看飘动效果请在设置面板里
+  手动打开，模型不同效果也不同。
+- 没有 `native/*.dll` 也能跑，会退化成纯 Python 渲染，只是慢一些。
+- 视线追踪依赖模型里有头 / 眼骨骼，缺骨骼的模型会自动关闭这一项。
+
+---
 
 ## 致谢
 
-模型格式与行为对齐上游 **Yes Steve Model**（Minecraft 模组）；动画分层
-（`pre_parallel`/`parallel`）、轮盘布局、视线追踪的「转头看你」都复刻自它。
+模型格式、解密方式、动画语义大量参考了上游 OpenYSM（原 Yes Steve Model）。
+本项目只是一个播放器，不自称与上游有关联，模型版权归各自作者。

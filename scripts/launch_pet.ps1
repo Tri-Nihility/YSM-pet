@@ -13,10 +13,14 @@ $Root  = Split-Path -Parent $PSScriptRoot              # 仓库根（scripts 的
 $Entry = Join-Path $Root 'scripts\run_pet.py'
 $Cache = Join-Path $Root '.run_pet_python'             # 记住上次选中的解释器
 
-# 桌宠真正需要的（缺一个就跑不起来；pybullet 是渲染用的矩阵数学）
-$Core = @('numpy', 'scipy', 'PySide6', 'PIL', 'yaml', 'pybullet')
-# 缺了只影响部分功能
-$Opt  = @('py7zr', 'torch')
+# 桌宠真正需要的（缺一个就跑不起来）
+# ⚠️ 这里**没有** pybullet / torch：
+#    pybullet 只为两个相机矩阵函数服务，已换成 src/pet/camera.py（纯 numpy），
+#           而且它在 PyPI 上没有 Windows 轮子，pip 装不上；
+#    torch   是训练线遗产，桌宠一行都不用。
+$Core = @('numpy', 'scipy', 'PySide6', 'PIL', 'yaml')
+# 缺了只影响部分功能（py7zr：解 .7z 格式的模型包）
+$Opt  = @('py7zr')
 
 # 只做 find_spec 不 import，所以很快；没有引号，避免被 PowerShell 改写
 $Probe = 'import importlib.util as u,sys;m=[x for x in sys.argv[1:] if u.find_spec(x) is None];print(sys.version.split()[0],len(m),*m)'
@@ -164,8 +168,8 @@ if (-not $chosen) {
     @"
 
 三条出路：
-  A) 给 Anaconda 自带的 3.12 环境装依赖（推荐；pybullet 只有 conda-forge 有 Windows 版）：
-       conda install -n py312 -c conda-forge pybullet
+  A) 给 Anaconda 自带的 3.12 环境装依赖（推荐）：
+       conda install -n py312 -c conda-forge scipy
        C:\private\yanjiusheng\Anaconda\envs\py312\python.exe -m pip install PySide6 numpy scipy pillow pyyaml tqdm
      装完直接再跑一次 run_pet.bat（会自动认出来，不用改任何路径）。
   B) 已经把依赖装在别的解释器里：设环境变量 YSM_PYTHON，或 run_pet.bat --python <那个 python.exe>

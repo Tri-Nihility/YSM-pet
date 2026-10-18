@@ -12,7 +12,9 @@
    所以未参与动画的骨骼 `M[n] == M[parent]`。每帧只重算「动画骨骼 + 其子孙」，
    通常只有 30~80 根，而不是 329 根。
 2. **批量变换**：所有面的顶点/法线用一次 `np.matmul` 批处理，不再逐面循环。
-3. **C++ 光栅化**：`native/raster.dll`（ctypes），算法与 `ysm/render.py` 严格一致。
+3. **C++ 光栅化**：`native/raster.dll`（ctypes），与纯 Python 回退路径
+   `_render_raw` 的算法严格一致（当初是对着 `ysm/render.py` 逐行校准的，
+   那份参考实现随 v0.3.0 的训练线清理一起删了，回退路径就是它的正统继承者）。
 4. **透明背景**：输出 RGBA，未覆盖处 alpha=0，直接给桌宠的透明窗口用。
 
 输出：uint8 (H, W, 4) RGBA（非预乘）。
@@ -70,7 +72,14 @@ _AMB, _HEMI_W, _DIFF_W = 0.60, 0.22, 0.18
 #      v7：“清晰模式”（只画人物本体）改为**默认开** —— hide 集合变了，
 #          模型包围盒随之变小（慧慧1.2 少了 42% 的面 / 法阵与立绘），
 #          量出来的宽高比不同，故 v6 缓存必须作废。
-_RATIO_CACHE_VER = 7
+#      v8：修 `_frame_core` **误裁双脚**的 bug —— 距离判据把脚当离群点砍掉，
+#          `frame_r` 低估 22% → 相机过近 → 看不见脚。新量法加了「断层检测
+#          + 竖直跨度下界」两道保护，健康模型不再裁，故 v7 缓存必须作废
+#          （否则用户机器上会一直沿用"缺脚"的尺寸）。
+#      v9：`has_res` 从 `available`（只看有没有层）改为 `active`（开关打开
+#          且 有层）—— 并行层默认关闭，量比例必须按**实际生效的叠加**来量，
+#          量出来的宽高比不同，故 v8 缓存必须作废。
+_RATIO_CACHE_VER = 9
 
 
 def _ratio_cache_path():
@@ -164,7 +173,7 @@ def _euler_rot(rx, ry, rz):
     return m
 
 
-def _frame_core(vis_v, gap=3.0, trim=2.5):
+def _frame_core(vis_v, gap=3.0, trim=2.5, jump=2.5, span_floor=1.5):
     """取景用的「核心顶点团」：去掉明显离群的远端特效面。
 
     很多模型会把刀光/法阵这类特效面（`ysmGlow_*` / `BeiJing*` /
@@ -172,8 +181,28 @@ def _frame_core(vis_v, gap=3.0, trim=2.5):
     撑大好几倍 —— 相机随之后退，人物缩成几个像素，表现就是
     **窗口在、画面上什么都没有**（慧慧1.2：radius 21.1 vs 身体 1.8×2.5）。
 
-    判据：以顶点中位数为心算距离 d；若 `p99 > gap × p75`（确实存在一坨
-    远端顶点）就只保留 `d <= trim × p75`。健康模型（p99 ≈ 2~3×p75）不动。
+    ⚠️ 但「离中心远」**不等于**「离群」—— 这是本函数踩过的最大一个坑：
+
+        人体是**细长的**。以顶点中位数为心，头顶的距离约等于身高的一半，
+        而**脚底的距离约等于整个身高**（中位数天然落在上半身：头发、脸、
+        裙子贡献了大部分顶点）。于是距离分布从 0 一路**连续**铺到 ≈身高，
+        p99/p75 轻松超过 3（亚托莉实测 3.08）—— 单看这个比值，"有离群
+        团"的判据就误触发了；而 `trim × p75` 这一刀正好落在小腿上：
+            被裁 510 顶点 = RightFoot(240) LeftFoot(240)
+                            RightLowerLeg(12) LeftLowerLeg(12) BackHair_M10(6)
+        模型高度 2.670 → 2.075，`frame_r` 低估 22% → 相机过近 29%
+        → **看不见脚**，人物占窗高 90% 顶满（用户报的"比例又出问题了"）。
+
+    所以真正的离群团必须用**断层**判定：把距离排序，若相邻两点的比值
+    ≥ `jump`（默认 2.5×，即中间空了一大段），那才是"远处另有一坨"；
+    分布连续（亚托莉最大跳变仅 1.36×，且落在 0.2% 分位的噪声区）
+    就说明**根本没有离群团，一个点都不该裁**。
+
+    三道保险（全过才裁）：
+      1. 粗筛 `p99 > gap × p75`   —— 便宜，健康模型直接放走；
+      2. 断层   上四分位以后的分布里存在 ≥ `jump` 倍的跳变；
+      3. 下界   截断半径 ≥ `span_floor × 稳健竖直跨度`（p98−p02）。
+                身体任何部位都在这个范围内，所以绝不会再砍到自己人。
 
     返回 `(取景顶点, 被裁掉的比例)`。
     """
@@ -183,11 +212,31 @@ def _frame_core(vis_v, gap=3.0, trim=2.5):
     med = np.median(vis_v, axis=0)
     d = np.linalg.norm(vis_v - med, axis=1)
     q75, q99 = (float(x) for x in np.percentile(d, [75, 99]))
-    if q75 > 1e-6 and q99 > gap * q75:
-        keep = d <= trim * q75
-        if int(keep.sum()) >= max(64, int(0.3 * n)):
-            return vis_v[keep], float(1.0 - keep.mean())
-    return vis_v, 0.0
+    if q75 <= 1e-6 or q99 <= gap * q75:
+        return vis_v, 0.0                       # 没有远端离群团
+
+    # 下界：模型「稳健竖直跨度」。竖直轴 = P_MAT 里映射到 pb_z 的那一列
+    # （raster.cpp 注释：pb_z = my，故正常情况下是模型 Y 轴）。
+    up = int(np.argmax(np.abs(P_MAT[2])))
+    lo98, hi98 = (float(x) for x in np.percentile(vis_v[:, up], [2, 98]))
+    h = hi98 - lo98
+    lim = trim * q75
+    if h > 1e-6:
+        lim = max(lim, span_floor * h)
+
+    # 断层检测：只看分布的上半段（离群团只可能出现在尾部）
+    s = np.sort(d)[int(0.5 * len(d)):]
+    if len(s) >= 4:
+        ratio = s[1:] / np.maximum(s[:-1], 1e-9)
+        j = int(np.argmax(ratio))
+        if ratio[j] < jump:
+            return vis_v, 0.0                   # 连续分布 → 没有离群团
+        lim = max(lim, float(s[j]))             # 截断半径取断层下沿
+
+    mask = d <= lim
+    if int(mask.sum()) < max(64, int(0.3 * n)):
+        return vis_v, 0.0                       # 裁得太狠 → 一律不动
+    return vis_v[mask], float(1.0 - mask.mean())
 
 
 class FastRenderer:
@@ -464,15 +513,14 @@ class FastRenderer:
         `_gaze_anchor_for`）就是用它把眼骨骼投影到窗口像素，让"光标对准脸"
         时头正好朝正前方，而不是锚在窗口几何中心（≈胸口）。
         """
-        import pybullet as p
+        # pybullet 已被 `pet.camera` 取代（它只为这两个纯数学函数服务，
+        # 而它在 PyPI 上没有 Windows 轮子 → CI 装不上）。见 camera.py 文档。
+        from pet.camera import proj_matrix, view_matrix
         Vw = np.asarray(world, float)
         Vp = (Vw - self.ctr) @ P_MAT.T
         dist = self.frame_r / np.tan(np.radians(fov / 2.0)) * self.zoom
-        vm = np.array(p.computeViewMatrixFromYawPitchRoll(
-            tuple(self.pctr), dist, yaw, pitch, 0,
-            upAxisIndex=2), float).reshape(4, 4).T
-        pm = np.array(p.computeProjectionMatrixFOV(
-            fov, float(W) / float(H), 0.05, 100), float).reshape(4, 4).T
+        vm = view_matrix(self.pctr, dist, yaw, pitch)
+        pm = proj_matrix(fov, float(W) / float(H), 0.05, 100)
         Mv = pm @ vm
         Vq = np.concatenate([Vp, [1.0]])
         clip = Vq @ Mv.T
@@ -616,8 +664,14 @@ class FastRenderer:
             gx1 = gy1 = -1
             n_scanned = 0
             n_clipped = 0
-            has_res = (resident is not None
-                       and getattr(resident, "available", False))
+            # ⚠️ 用 `active`（开关打开 且 有层），不能用 `available`（只看有没有
+            #    层）：并行层默认关闭，量比例必须按**实际生效的叠加**来量，
+            #    否则会把被藏起来的身体/特效也算进包围盒，窗口尺寸就错了。
+            _on = getattr(resident, "active", None)
+            if _on is None:                       # 老对象没有 active → 退化
+                _on = bool(getattr(resident, "enabled", True)) and bool(
+                    getattr(resident, "available", False))
+            has_res = resident is not None and bool(_on)
 
             def scan(base_pose, t):
                 nonlocal gx0, gy0, gx1, gy1, n_scanned, n_clipped
@@ -728,16 +782,13 @@ class FastRenderer:
 
     def _render_cpp(self, anim, W, H, ss, yaw, pitch, fov, zoom):
         """FK + 相机矩阵仍在 Python（很便宜），其余全在 C++ 内完成。"""
-        import pybullet as p
+        from pet.camera import proj_matrix, view_matrix
         Mcur, vis = self.pose_matrices(anim)
         dist = self.frame_r / np.tan(np.radians(fov / 2)) * zoom
         vm = np.ascontiguousarray(
-            np.array(p.computeViewMatrixFromYawPitchRoll(
-                tuple(self.pctr), dist, yaw, pitch, 0,
-                upAxisIndex=2)).reshape(4, 4).T, np.float64)
+            view_matrix(self.pctr, dist, yaw, pitch), np.float64)
         pm = np.ascontiguousarray(
-            np.array(p.computeProjectionMatrixFOV(
-                fov, W / H, 0.05, 100)).reshape(4, 4).T, np.float64)
+            proj_matrix(fov, W / H, 0.05, 100), np.float64)
         out, _ = self._buf("out", W, H)
         v8 = np.ascontiguousarray(vis, np.uint8)
         self._vis_ref = v8
@@ -764,7 +815,7 @@ class FastRenderer:
 
     def _render_raw(self, anim, W, H, yaw, pitch, fov, zoom, cull):
         """返回 uint8 RGBA (H, W, 4)，未覆盖处 alpha=0。"""
-        import pybullet as p
+        from pet.camera import proj_matrix, view_matrix
         Mcur, vis = self.pose_matrices(anim)
 
         keep = vis[self.fb]
@@ -807,10 +858,8 @@ class FastRenderer:
         # 所以相机目标必须是原点；再传 P_MAT@ctr 会双重偏移，
         # 导致模型被推到画面右下方且被放大（此前所有 fast 渲染图都偏近的根因）。
         dist = self.frame_r / np.tan(np.radians(fov / 2)) * zoom
-        vm = np.array(p.computeViewMatrixFromYawPitchRoll(
-            tuple(self.pctr), dist, yaw, pitch, 0, upAxisIndex=2)).reshape(4, 4).T
-        pm = np.array(p.computeProjectionMatrixFOV(
-            fov, W / H, 0.05, 100)).reshape(4, 4).T
+        vm = view_matrix(self.pctr, dist, yaw, pitch)
+        pm = proj_matrix(fov, W / H, 0.05, 100)
         Mv = pm @ vm
         Vq = np.concatenate([Vp, np.ones((Vp.shape[0], 4, 1))], -1)
         clip = np.matmul(Vq, Mv.T)

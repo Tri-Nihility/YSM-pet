@@ -1,19 +1,17 @@
-# Python
+# ---------- Python ----------
 __pycache__/
 *.py[cod]
 *.egg-info/
 .venv/
+venv/
 .run_pet_python
 
-# 数据（体积大，不放仓库）
-data/raw/
-data/interim/
+# ---------- 本机渲染产物 / 模型缓存（不入库） ----------
+outputs/
 data/cache/
 data/decrypted/
-# processed 里只有 skeleton9.json（骨架绑定结果）要入库，其余忽略
-data/processed/*
-!data/processed/.gitkeep
-!data/processed/skeleton9.json
+
+# ---------- 大二进制（训练线遗留规则，留着防误提交） ----------
 *.npy
 *.npz
 *.pt
@@ -21,32 +19,24 @@ data/processed/*
 *.bvh
 *.fbx
 
-# 训练产物
-# checkpoints 是权重（每次训练都会重写，不入库）
-outputs/checkpoints/
-# logs 里的小结果文件要入库（训练曲线 / 评估数字），其余忽略
-outputs/logs/*
-!outputs/logs/*.csv
-!outputs/logs/*.json
-!outputs/logs/*.png
-!outputs/logs/.gitkeep
-outputs/pet/
-runs/
-
-# 打包 / 前端构建产物
+# ---------- 打包中间产物 ----------
 build/
 dist/
-web/node_modules/
-web/dist/
 
-# 参考素材与临时文件（体积大，可重新获取）
+# ---------- 本机原生编译中间产物（native/*.dll 本身要入库） ----------
+native/*.o
+native/*.a
+native/*.def
+native/*.pyd
+native/*.exp
+native/*.lib
+
+# ---------- 参考素材 / 临时文件（体积大，可重新获取） ----------
 临时文件（记得整理掉/
 
-# 系统
+# ---------- 系统 / 编辑器 ----------
 .DS_Store
 Thumbs.db
 desktop.ini
-
-# 编辑器
 .vscode/
 .idea/

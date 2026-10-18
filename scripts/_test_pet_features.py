@@ -23,11 +23,24 @@ from PySide6 import QtWidgets, QtCore, QtGui                   # noqa: E402
 
 
 def main():
-    from pet import loader as L
+    # 模型来源走 `modelsource`（与 run_pet.py 同一条路径），吃 .ysm / 文件夹 /
+    # zip·7z·rar；不传就读上次记住的模型。以前这里用 `loader.load_all()`，
+    # 它默认去 data/decrypted/*.bin —— 那是 gitignore 掉的本机产物，
+    # 别人 clone 下来必然 FileNotFoundError。
+    src = sys.argv[1] if len(sys.argv) > 1 else None
+    if not src:
+        from pet import settings as S
+        src = S.load().get("model")
+    if not src:
+        print("用法: python scripts/_test_pet_features.py "
+              "<模型来源 .ysm/文件夹/压缩包>")
+        return 2
+
+    from pet import modelsource as MS
     from pet.gaze import GazeTracker
     from ysm.clips import ClipLibrary
 
-    d = L.load_all()
+    d = MS.load_source(src, progress=None)
     model = d["model"]
     print("骨骼=%d" % len(model.order))
 

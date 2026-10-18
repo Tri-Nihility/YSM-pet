@@ -384,9 +384,19 @@ class ResidentPlayer:
         self.t0 = time.time()
 
     # ------------------------------------------------------------------
+    # ⚠️「模型有没有并行层」和「并行层开没开」是**两件事**，必须分开：
+    #    曾经这里只有 `available = enabled and (pre or post)`，而桌宠默认
+    #    `enabled=False` —— 于是设置面板里 `if res.available:` 这个判据
+    #    **永远为假，复选框根本画不出来**，用户就再也没法把并行层打开了。
+    #    这就是用户报的「并行层动画功能消失」。
     @property
     def available(self):
-        """只有「开关打开且有层」才算可用（量比例时也按这个判）。"""
+        """模型**有没有**并行层（**与开关无关**）—— UI 用它决定要不要画开关。"""
+        return bool(self.pre or self.post)
+
+    @property
+    def active(self):
+        """并行层**是否真的在生效**（开关打开 且 有层）—— 量比例时按这个判。"""
         return bool(self.enabled and (self.pre or self.post))
 
     @property

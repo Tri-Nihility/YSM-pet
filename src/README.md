@@ -1,24 +1,45 @@
 # src 模块导航
 
-详细设计见 `docs/03-方案设计.md`。这里只写一句话职责，避免重复。
+YSM-pet 是**桌宠**项目：读 YSM 模型的 `.ysm`，把它当桌面宠物渲染出来。
+没有训练、没有物理仿真 —— 那一整套（动捕数据管线 / 运动模型 / PPO 训练 /
+GLTF 导出 / web 控制台）已在 v0.3.0 里整体删除。
 
-| 目录        | 一句话职责                                 |
-| --------- | ------------------------------------- |
-| `data/`   | 原始动捕 / YSM 动画 → 重定向 → 归一化 → `Dataset` |
-| `models/` | 运动模型本体（条件编码、序列生成、FK 层）                |
-| `train/`  | 训练循环、损失、优化器、checkpoint、日志             |
-| `eval/`   | 指标计算、pybullet 可视化、滑步检测                |
-| `export/` | 张量 → YSM 动画文件                         |
+| 目录 / 文件              | 一句话职责                                          |
+| ------------------------ | --------------------------------------------------- |
+| `pet/petapp.py`          | 桌宠窗口、渲染线程、右键菜单、设置面板、动画轮盘     |
+| `pet/fastrender.py`      | 快速渲染器：向量化 FK + 相机矩阵 + C++ 光栅化       |
+| `pet/camera.py`          | 相机矩阵（复刻 pybullet 的两个函数，纯 numpy）       |
+| `pet/gaze.py`            | 视线追踪：头 / 眼跟随鼠标                            |
+| `pet/modelsource.py`     | 模型来源解析：`.ysm` / 文件夹 / zip·7z·rar 压缩包     |
+| `pet/loader.py`          | 素材加载：`.ysm` → 骨骼树 + 贴图 + 需隐藏骨骼         |
+| `pet/settings.py`        | 设置持久化（记住模型与偏好），含老配置迁移            |
+| `ysm/ysmcrypt.py`        | `.ysm` 解密（A5 专有算法）                           |
+| `ysm/ysmbin.py`          | 二进制反序列化：烘焙面、动画、贴图字节               |
+| `ysm/ysmmodel.py`        | 骨骼树构建（name / parent / pivot / cubes / faces）  |
+| `ysm/animation.py`       | 动画通道采样（含 molang 表达式求值）                 |
+| `ysm/molang.py`          | molang 表达式求值器                                  |
+| `ysm/clips.py`           | 模型自带动画 → 可播放 clip；常驻并行层、ClipPlayer    |
+| `ysm/nativeload.py`      | 加载 `native/*.dll`（失败自动回退纯 Python）         |
+| `phys/bind.py`           | 坐标约定：模型空间 ↔ pybullet 空间的 `P_MAT`         |
 
-## 开工顺序建议
 
-1. `data/` + `tests/`（先让数据管线跑通，用单类数据验证 FK 正确）
-2. `models/` 最小版 + `train/` 单类过拟合
-3. `eval/` 指标与可视化
-4. `export/` 等 YSM 骨骼格式确认后再动
+## 渲染链路
 
-## 通用约定
+```
+.ysm ──ysmcrypt+ysmbin──> raw ──ysmmodel──> 骨骼树
+                                              │
+                    clips.ClipLibrary ────────┤─> 动画字典 {bone:{rot,pos,scale}}
+                    petapp.IdleAnimator ──────┤
+                    pet.gaze.GazeTracker ─────┘
+                                              │
+                              fastrender.FastRenderer
+                              （FK → native/raster.dll 光栅化）
+                                              │
+                                      RGBA → 透明窗口
+```
 
-- 几何/旋转计算统一放 `models/` 或 `data/` 的公共模块，**不要在 train 里临时写 FK**
-- 所有配置从 `configs/*.yaml` 读，不写死常量
-- 每个模块优先写对应 `tests/`，尤其是重定向与 FK —— 这类错误肉眼极难发现
+叠加顺序（后写覆盖）对齐原版 YSM 的分层：
+
+```
+待机（呼吸/摆头）→ pre_parallel → 主体动画 → parallel → 表情显隐 → 视线追踪
+```

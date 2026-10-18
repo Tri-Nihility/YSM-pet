@@ -2422,10 +2422,10 @@ def run(model=None, tex=None, hide=(), rig=None, scale=1.0, fps=30,
              fr.zoom))
 
     # 视线追踪：默认关闭（用户需在菜单/面板里手动开启）
-    # ⚠️ 必须在这里显式导入。本模块只在函数内部 import `pet.gaze`（顶层引入
-    #    会把 pybullet 一起拖进来，拖慢桌宠冷启动），所以 1529 行用到的
-    #    GazeTracker **不会**从模块作用域看到 —— 漏了这一行就是启动即崩
-    #    `NameError: name 'GazeTracker' is not defined`。
+    # ⚠️ 必须在这里显式导入。本模块只在函数内部 import `pet.gaze`
+    #    （顶层引入会连带把 numpy/scipy 的大型 clique 拉进模块作用域，
+    #     拖慢桌宠冷启动），所以下面用到的 GazeTracker **不会**从模块作用域
+    #    看到 —— 漏了这一行就是启动即崩 `NameError: name 'GazeTracker' is not defined`。
     #    各种测试脚本自己 `from pet.gaze import GazeTracker`，所以它们测不出来。
     from pet.gaze import GazeTracker
     gaze = GazeTracker(model)
@@ -2452,13 +2452,23 @@ def run(model=None, tex=None, hide=(), rig=None, scale=1.0, fps=30,
              len(pre_layers) + len(post_layers)))
 
     animator = IdleAnimator(model)
+    # 并行层开关（下面决定待机策略、以及传给 PetWindow 时都要用同一个值）
+    _par_on = bool(cfg.get("parallel_enabled", False))
     # 模型自带动画时优先用它自己的（对齐原版 YSM）；只有啥都没有的模型才
     # 用程序化呼吸兜底。用户在菜单/面板里手动开关过就不再自动决定。
     if bool(cfg.get("idle_auto", True)):
-        animator.enabled = not bool(dclip or pre_layers or post_layers)
+        # 只有「真正在播的模型自带动画」才顶掉程序化呼吸：
+        #   * 默认待机动画（idle / preview）—— 一直播；
+        #   * 并行层 —— **只有开关打开时它才在播**。开关关着时这些模型其实
+        #     没有任何动画在跑（它们的 idle 常是空壳 rest 姿势），必须退回
+        #     程序化呼吸，否则桌宠就是一具不动的静帧 —— 这正是"并行层动画
+        #     功能消失"看起来最直观的样子。
+        _has_own = bool(dclip) or (_par_on and bool(pre_layers or post_layers))
+        animator.enabled = not _has_own
         print("待机: %s（%s）"
               % ("程序化呼吸" if animator.enabled else "模型自带动画",
-                 "模型无自带动画" if animator.enabled else "模型有自带动画"))
+                 "没有动画在播" if animator.enabled else
+                 "模型自带 idle" if dclip else "常驻并行层"))
     else:
         animator.enabled = bool(cfg.get("idle_enabled", True))
     # 比例缓存键：模型来源路径（首次向导选的 src 或设置里存的）。换了模型
@@ -2466,7 +2476,7 @@ def run(model=None, tex=None, hide=(), rig=None, scale=1.0, fps=30,
     model_key = src or cfg.get("model") or ""
     w = PetWindow(fr, animator, rig=None, scale=scale, fps=fps,
                   gaze=gaze, clips=clips, model_key=model_key,
-                  parallel=bool(cfg.get("parallel_enabled", False)))
+                  parallel=_par_on)
 
     # 默认待机 = 模型的常驻默认动画（原版 YSM 实体站着时播的那个）
     if dclip:
