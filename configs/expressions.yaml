@@ -1,0 +1,83 @@
+# ============================================================
+# 表情接口（预留）
+#
+# YSM 的表情不是形变，而是「显隐」：作者把多种眉/眼/嘴做成并列骨骼，
+# 用 scale = (0,0,0) 把不需要的隐藏。所以本接口是**槽位 + 互斥选项**模型：
+#
+#   setSlot("mouth", "smile")        → 只显示 mouth.smile 列出的骨骼
+#   setWeights("mouth", {"smile":1, ...}) → 取权重最大的选项
+#   clearSlot("mouth")               → 回落到 default
+#
+# 训练阶段（站立/行走）完全不碰表情，接口保持零侵入；
+# GUI 面板会为每个槽生成一排按钮。
+#
+# ⚠️ 选项名（smile/surprise…）是**人工标注**，语义需对照贴图确认；
+#    骨骼名是直接从 ATRI 模型里读出来的，一定存在。
+# ============================================================
+
+version: 1
+model: atri
+enabled: false                 # 训练时 false；GUI 手动摆 pose 时 true
+
+# 表情只影响这些骨骼的显隐，不影响任何关节角
+mode: visibility               # visibility（scale=0/1）
+
+slots:
+  # ---------- 脸（两套整脸，互斥）----------
+  face:
+    label: 脸
+    default: base
+    options:
+      base:  {bones: [Face]}
+      alt:   {bones: [FaceB]}
+
+  # ---------- 眉 ----------
+  brow:
+    label: 眉
+    default: normal
+    options:
+      normal:   {bones: [Eyebrow]}
+      normal2:  {bones: [Eyebrow2]}
+
+  # ---------- 眼（两套，互斥；可配合 face 槽）----------
+  eyes:
+    label: 眼
+    default: base
+    options:
+      base: {bones: [Eyes]}
+      alt:  {bones: [Eyes2]}
+
+  # ---------- 嘴 ----------
+  mouth:
+    label: 嘴
+    default: m9
+    options:
+      m9:      {bones: [Mouth9]}
+      m10:     {bones: [Mouth10]}
+      m11:     {bones: [Mouth11]}
+      m12:     {bones: [Mouth12]}
+      m13:     {bones: [Mouth13]}
+      m14:     {bones: [Mouth14, Mouth15]}
+      zui3:    {bones: [Zui, Zui3]}
+      m8:      {bones: [mouthew, mouth8]}
+      m2:      {bones: [mouthew, mouth2]}
+      m3:      {bones: [mouthew, mouth3]}
+      m4:      {bones: [mouthew, mouth4]}
+      m5:      {bones: [mouthew, Mouth5]}
+      m7:      {bones: [mouthew, Mouth7]}
+      m6:      {bones: [Mouthc, mouth6]}
+      m16:     {bones: [Mouthc, mouth16]}
+      m17:     {bones: [Mouthc, mouth17]}
+      mbase:   {bones: [Mouthc, mouth]}
+
+  # ---------- 眨眼（预留：是否显示「眼上高光/眼皮」层）----------
+  blink:
+    label: 眨眼
+    default: open
+    options:
+      open:  {bones: [LeftEyePublic, RightEyePublic]}
+      close: {bones: [LeftEyePublic2, RightEyePublic2]}
+
+# 预留：后续若要做「权重混合形变」，在这里登记驱动骨 + 位移/旋转
+# （当前 YSM 不支持蒙皮形变，故仅作接口占位）
+reserved_morph_targets: []

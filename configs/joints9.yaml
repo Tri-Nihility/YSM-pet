@@ -1,0 +1,210 @@
+# ============================================================
+# 九自由度可控骨架（阶段 4）
+#
+# 设计约束（来自需求）：
+#   1. 绑定骨架        —— 从 YSM 模型的 329 根骨骼里抽精简物理骨架
+#   2. 9 个可控关节    —— 左肘/右肘/左膝/右膝/左肩/右肩/左大腿根/右大腿根/脖子
+#   3. 预留表情接口    —— 见 configs/expressions.yaml
+#   4. 不使用自带动作  —— use_native_animation: false（硬开关）
+#   5. 添加重力        —— 见 configs/phys.yaml
+#   6. 课程            —— stage1 站立 → stage2 行走
+#   7. GUI             —— TypeScript，控制训练 + 渲染 + 摆 pose
+#
+# 坐标系（模型空间，右手系，单位 = 方块）：
+#     +X = 角色右侧      -X = 角色左侧
+#     +Y = 上
+#     -Z = 角色正前方    +Z = 角色正后方
+#   旋转语义：关节角 q（度）= 绕 +X 轴的右手正向旋转。
+#     q > 0  →  肢体向 -Z（前方）摆动
+#     q < 0  →  肢体向 +Z（后方）摆动
+#   映射到 YSM 骨骼时 rotation.x = -q（上游 RotationValue 对 X/Y 取负）。
+# ============================================================
+
+version: 1
+model: atri                      # 对应 data/decrypted/亚托莉目标模型.bin
+model_file: 亚托莉目标模型.bin
+
+# ⛔ 硬开关：训练与渲染一律不得加载/采样模型自带动画。
+#    所有姿态只能来自本文件定义的 9 个关节角 + 表情接口。
+use_native_animation: false
+
+units:
+  length: block                  # 1 方块 ≈ 1 米（见 meters_per_block）
+  meters_per_block: 1.0
+  angle: degree                  # 关节角单位；物理内部转弧度
+
+# ------------------------------------------------------------
+# 根（浮动基）：URDF 的 root link，pybullet 里 useFixedBase=False
+# ------------------------------------------------------------
+root:
+  bone: AllBody
+  pivot: [0.0, 1.062, 0.0]       # 髋部高度
+  segment: pelvis
+
+# ------------------------------------------------------------
+# 9 个可控关节。索引即顺序，GUI 滑块按此顺序排列。
+# ------------------------------------------------------------
+joints:
+  - name: leftElbow
+    label: 左肘
+    bone: LeftForeArm
+    parent: LeftArm
+    pivot: [-0.258, 1.522, 0.002]
+    axis: [1.0, 0.0, 0.0]        # 绕 +X（模型空间）
+    limits: [0.0, 140.0]         # 屈肘：前臂向前弯
+    default: 15.0
+    torque_limit: 60.0
+    segment: foreArmL
+
+  - name: rightElbow
+    label: 右肘
+    bone: RightForeArm
+    parent: RightArm
+    pivot: [0.258, 1.522, 0.002]
+    axis: [1.0, 0.0, 0.0]
+    limits: [0.0, 140.0]
+    default: 15.0
+    torque_limit: 60.0
+    segment: foreArmR
+
+  - name: leftKnee
+    label: 左膝
+    bone: LeftLowerLeg
+    parent: LeftLeg
+    pivot: [-0.138, 0.733, 0.0]
+    axis: [1.0, 0.0, 0.0]
+    limits: [-140.0, 0.0]        # 膝只能向后弯（小腿摆向 +Z）
+    default: -8.0
+    torque_limit: 200.0
+    segment: shinL
+
+  - name: rightKnee
+    label: 右膝
+    bone: RightLowerLeg
+    parent: RightLeg
+    pivot: [0.138, 0.733, 0.0]
+    axis: [1.0, 0.0, 0.0]
+    limits: [-140.0, 0.0]
+    default: -8.0
+    torque_limit: 200.0
+    segment: shinR
+
+  - name: leftShoulder
+    label: 左肩
+    bone: LeftArm
+    parent: Arm                  # 挂点骨骼，静止无旋转
+    pivot: [-0.213, 1.894, 0.0]
+    axis: [1.0, 0.0, 0.0]
+    limits: [-90.0, 90.0]
+    default: 5.0
+    torque_limit: 80.0
+    segment: upperArmL
+
+  - name: rightShoulder
+    label: 右肩
+    bone: RightArm
+    parent: Arm
+    pivot: [0.213, 1.894, 0.0]
+    axis: [1.0, 0.0, 0.0]
+    limits: [-90.0, 90.0]
+    default: -5.0
+    torque_limit: 80.0
+    segment: upperArmR
+
+  - name: leftHip
+    label: 左大腿根
+    bone: LeftLeg
+    parent: Leg
+    pivot: [-0.150, 1.277, 0.0]
+    axis: [1.0, 0.0, 0.0]
+    limits: [-40.0, 100.0]       # q>0 = 大腿向前抬
+    default: 3.0
+    torque_limit: 250.0
+    segment: thighL
+
+  - name: rightHip
+    label: 右大腿根
+    bone: RightLeg
+    parent: Leg
+    pivot: [0.150, 1.277, 0.0]
+    axis: [1.0, 0.0, 0.0]
+    limits: [-40.0, 100.0]
+    default: -3.0
+    torque_limit: 250.0
+    segment: thighR
+
+  - name: neck
+    label: 脖子
+    bone: AllHead
+    parent: UpperBody
+    pivot: [0.0, 1.981, -0.002]
+    axis: [1.0, 0.0, 0.0]
+    limits: [-35.0, 35.0]        # q>0 = 低头
+    default: 0.0
+    torque_limit: 40.0
+    segment: head
+
+# ------------------------------------------------------------
+# 物理分段：每根 YSM 骨骼归属到「最近的段根祖先」。
+# 段质量 = 该段所有骨骼的方块体积 × 密度，最后归一化到 total_mass。
+# ------------------------------------------------------------
+segments:
+  pelvis:    {root_bone: AllBody,     parent: null}
+  torso:     {root_bone: UpperBody,   parent: pelvis}
+  head:      {root_bone: AllHead,     parent: torso}
+  upperArmL: {root_bone: LeftArm,     parent: torso}
+  foreArmL:  {root_bone: LeftForeArm, parent: upperArmL}
+  upperArmR: {root_bone: RightArm,    parent: torso}
+  foreArmR:  {root_bone: RightForeArm, parent: upperArmR}
+  thighL:    {root_bone: LeftLeg,     parent: pelvis}
+  shinL:     {root_bone: LeftLowerLeg, parent: thighL}
+  thighR:    {root_bone: RightLeg,    parent: pelvis}
+  shinR:     {root_bone: RightLowerLeg, parent: thighR}
+
+# 脚掌不在 9 关节内 → 固定焊在小腿段末端，提供支撑面
+fixed_attachments:
+  - {bone: LeftFoot,  parent: shinL}
+  - {bone: RightFoot, parent: shinR}
+
+# ------------------------------------------------------------
+# 质量
+# ------------------------------------------------------------
+mass:
+  # 参考值：成年女性体段质量占比（Winter《Biomechanics of Human Movement》）
+  # 乘以总体重得到下面 override；头部 8.3% 已把长发算进去。
+  #
+  # ⚠️ 之所以不用「按方块体积自动分配」：YSM 的头发/裙摆是空心薄壳，
+  #    AABB 体积累加会把头部吹到 39%（实测 240 根骨骼 1.15 方块³），
+  #    头重脚轻会让站立根本学不会。默认走 override，自动模式保留做对照。
+  total_kg: 51.8
+  auto_from_volume: false          # true = 忽略 override，按体积比例分配
+  max_segment_share: 0.34          # 自动模式下单段占比上限
+  override:
+    pelvis:    10.0
+    torso:     15.5
+    head:       4.3
+    upperArmL:  1.5
+    upperArmR:  1.5
+    foreArmL:   1.1
+    foreArmR:   1.1
+    thighL:     5.2
+    thighR:     5.2
+    shinL:      3.2
+    shinR:      3.2
+
+# ------------------------------------------------------------
+# 渲染时要剔除的骨骼（背景板、自发光特效件等，不属于角色本体）
+# ------------------------------------------------------------
+hide_bones:
+  - bk
+  - KJ
+  - bone
+  - Background
+  - Background1
+  - ysmGlowDD6
+  - ysmGlowbackground
+  - ysmGlowTnt_Right_bone
+  - NysmGlowTnt_Right_bone
+  - MooncakleH
+  - MooncakleH2
+  - gui

@@ -1,0 +1,23 @@
+# YSM-pet 依赖清单
+#
+# 桌宠运行必需（源码方式跑才需要；打包版已内置，无需安装）：
+#   PySide6      窗口 / 渲染呈现
+#   numpy scipy  几何与矩阵
+#   pyyaml       配置
+#   tqdm         进度条
+#   Pillow       贴图处理
+#   pybullet     只用它的视图/投影矩阵函数（纯矩阵数学）
+#               PyPI 无 Windows 轮子，走 conda-forge：
+#               conda install -y --override-channels -c conda-forge pybullet
+#
+# 训练线遗产（src/env、src/train、scripts/train.py 才需要，桌宠不经过）：
+#   torch==2.14.1+cpu    仅 CPU 版，别被换成 CUDA 版
+#   matplotlib           训练曲线
+
+PySide6
+numpy
+scipy
+pyyaml
+tqdm
+Pillow
+pybullet

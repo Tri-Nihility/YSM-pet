@@ -1,0 +1,48 @@
+# 默认训练配置（模板，尚未启用）
+# 骨架定义见 skeleton.yaml，骨骼映射见 skeleton_map.yaml
+
+project:
+  name: ysm-motion
+  seed: 42
+  device: cpu
+  torch_threads: 4
+
+data:
+  skeleton: ysm_humanoid_v0        # 必须存在于 configs/skeleton.yaml
+  fps: 30
+  seq_len: 90                      # 每条训练样本的帧数
+  stride: 30                       # 滑窗步长（重叠采样）
+  actions: [idle, walk, run, jump]
+  train_ratio: 0.9
+  num_workers: 0                   # Windows + 小数据，0 更快
+
+model:
+  arch: autoregressive_transformer # 基线；备选：vae / diffusion
+  d_model: 192
+  n_layers: 3
+  n_heads: 4
+  dropout: 0.1
+  cond_mode: action_label          # one-hot 动作类别
+  max_seq_len: 240
+
+train:
+  batch_size: 16
+  epochs: 200
+  lr: 1.0e-3
+  weight_decay: 1.0e-4
+  grad_clip: 1.0
+  warmup_steps: 500
+  save_every: 20
+
+loss:
+  w_rot: 1.0                       # 局部旋转重建
+  w_pos: 0.5                       # FK 后关节位置
+  w_root_vel: 0.5                  # 根速度与朝向
+  w_foot_skate: 0.1                # 足部滑步
+  w_bone_len: 0.01                 # 骨长一致性
+  w_smooth: 0.01                   # jerk 平滑
+
+eval:
+  every_epochs: 10
+  visualize_with_pybullet: true
+  metrics: [mpjpe, angle_err, foot_skating, jerk]

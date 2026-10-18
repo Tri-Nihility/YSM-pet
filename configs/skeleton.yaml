@@ -1,0 +1,46 @@
+# 统一训练骨架定义
+#
+# ⚠️ 当前为「占位草案」：关节名取自通用人形骨架（Mixamo/SMPL 风格命名）。
+#    拿到目标 YSM 模型后，需确认是否改用其原生骨骼名。
+#    一旦改动本文件，所有 data/processed 下的数据必须重跑。
+
+name: ysm_humanoid_v0
+fps: 30
+
+# 索引即顺序，禁止中途插入/删除
+joint_names:
+  - hips
+  - spine
+  - chest
+  - neck
+  - head
+  - leftShoulder
+  - leftArm
+  - leftForeArm
+  - leftHand
+  - rightShoulder
+  - rightArm
+  - rightForeArm
+  - rightHand
+  - leftUpLeg
+  - leftLeg
+  - leftFoot
+  - leftToeBase
+  - rightUpLeg
+  - rightLeg
+  - rightFoot
+  - rightToeBase
+
+# 父关节索引，-1 表示根
+parents: [-1, 0, 1, 2, 3, 2, 5, 6, 7, 2, 9, 10, 11, 0, 13, 14, 15, 0, 17, 18, 19]
+
+# T-pose 下每个关节相对父关节的偏移（单位：米）
+# TODO: 填入真实数值。这是 FK / 骨长校验 / 重定向缩放的基准，不能瞎填。
+tpose_offsets: null
+
+# 每个关节的静止姿态修正四元数（源骨架坐标系 → 本骨架坐标系）
+# TODO: 重定向阶段按需填写；不填则视为单位四元数
+rest_correction: null
+
+# 用于足部接触标签与滑步惩罚
+foot_joints: [leftToeBase, rightToeBase, leftFoot, rightFoot]

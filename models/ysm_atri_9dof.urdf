@@ -1,0 +1,228 @@
+<?xml version="1.0" ?>
+<robot name="ysm_atri_9dof">
+  <link name="pelvis">
+    <inertial>
+      <mass value="10.000000"/>
+      <inertia ixx="0.00416667" ixy="0" ixz="0" iyy="0.00416667" iyz="0" izz="0.00416667"/>
+    </inertial>
+  </link>
+  <link name="torso">
+    <inertial>
+      <origin xyz="0.004688 0.000000 0.164129" rpy="0 0 0"/>
+      <mass value="15.500000"/>
+      <inertia ixx="2.64213871" ixy="0" ixz="0" iyy="2.13473673" iyz="0" izz="0.97713796"/>
+    </inertial>
+    <collision>
+      <origin xyz="0.004688 0.000000 0.164129" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.426419 0.758064 1.212793"/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="head">
+    <inertial>
+      <origin xyz="-0.155308 0.000000 -0.330271" rpy="0 0 0"/>
+      <mass value="4.300000"/>
+      <inertia ixx="2.27155336" ixy="0" ixz="0" iyy="1.98692014" iyz="0" izz="1.27049312"/>
+    </inertial>
+    <collision>
+      <origin xyz="-0.155308 0.000000 -0.330271" rpy="0 0 0"/>
+      <geometry>
+        <box size="1.172868 1.473073 2.041880"/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="upperArmL">
+    <inertial>
+      <origin xyz="0.000000 0.015625 -0.162500" rpy="0 0 0"/>
+      <mass value="1.500000"/>
+      <inertia ixx="0.02444458" ixy="0" ixz="0" iyy="0.02850708" iyz="0" izz="0.01041260"/>
+    </inertial>
+    <collision>
+      <origin xyz="0.000000 0.015625 -0.162500" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.240625 0.159375 0.412500"/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="foreArmL">
+    <inertial>
+      <origin xyz="0.000781 -0.001083 -0.181250" rpy="0 0 0"/>
+      <mass value="1.100000"/>
+      <inertia ixx="0.03093683" ixy="0" ixz="0" iyy="0.03140858" iyz="0" izz="0.01419178"/>
+    </inertial>
+    <collision>
+      <origin xyz="0.000781 -0.001083 -0.181250" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.282813 0.273563 0.512500"/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="upperArmR">
+    <inertial>
+      <origin xyz="0.000000 -0.015625 -0.162500" rpy="0 0 0"/>
+      <mass value="1.500000"/>
+      <inertia ixx="0.02444458" ixy="0" ixz="0" iyy="0.02850708" iyz="0" izz="0.01041260"/>
+    </inertial>
+    <collision>
+      <origin xyz="0.000000 -0.015625 -0.162500" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.240625 0.159375 0.412500"/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="foreArmR">
+    <inertial>
+      <origin xyz="0.000781 0.001083 -0.181250" rpy="0 0 0"/>
+      <mass value="1.100000"/>
+      <inertia ixx="0.03093683" ixy="0" ixz="0" iyy="0.03140858" iyz="0" izz="0.01419178"/>
+    </inertial>
+    <collision>
+      <origin xyz="0.000781 0.001083 -0.181250" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.282813 0.273563 0.512500"/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="thighL">
+    <inertial>
+      <origin xyz="0.000000 -0.012500 -0.250000" rpy="0 0 0"/>
+      <mass value="5.200000"/>
+      <inertia ixx="0.15966045" ixy="0" ixz="0" iyy="0.16419268" iyz="0" izz="0.04963444"/>
+    </inertial>
+    <collision>
+      <origin xyz="0.000000 -0.012500 -0.250000" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.250000 0.228125 0.562500"/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="shinL">
+    <inertial>
+      <origin xyz="0.086719 -0.000781 -0.307248" rpy="0 0 0"/>
+      <mass value="3.200000"/>
+      <inertia ixx="0.20740430" ixy="0" ixz="0" iyy="0.24765435" iyz="0" izz="0.07153261"/>
+    </inertial>
+    <collision>
+      <origin xyz="0.086719 -0.000781 -0.307248" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.457813 0.242188 0.848004"/>
+      </geometry>
+    </collision>
+    <collision>
+      <origin xyz="0.086719 -0.000781 -0.621215" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.457813 0.242188 0.220070"/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="thighR">
+    <inertial>
+      <origin xyz="0.000000 0.012500 -0.250000" rpy="0 0 0"/>
+      <mass value="5.200000"/>
+      <inertia ixx="0.15966045" ixy="0" ixz="0" iyy="0.16419268" iyz="0" izz="0.04963444"/>
+    </inertial>
+    <collision>
+      <origin xyz="0.000000 0.012500 -0.250000" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.250000 0.228125 0.562500"/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="shinR">
+    <inertial>
+      <origin xyz="0.086719 0.000781 -0.307248" rpy="0 0 0"/>
+      <mass value="3.200000"/>
+      <inertia ixx="0.20740430" ixy="0" ixz="0" iyy="0.24765435" iyz="0" izz="0.07153261"/>
+    </inertial>
+    <collision>
+      <origin xyz="0.086719 0.000781 -0.307248" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.457813 0.242188 0.848004"/>
+      </geometry>
+    </collision>
+    <collision>
+      <origin xyz="0.086719 0.000781 -0.621215" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.457813 0.242188 0.220070"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="torso_fixed" type="fixed">
+    <origin xyz="0.000000 0.000000 0.182812" rpy="0 0 0"/>
+    <parent link="pelvis"/>
+    <child link="torso"/>
+  </joint>
+  <joint name="leftElbow" type="revolute">
+    <origin xyz="-0.001563 0.045312 -0.371875" rpy="0 0 0"/>
+    <parent link="upperArmL"/>
+    <child link="foreArmL"/>
+    <axis xyz="0 -1 0"/>
+    <limit lower="0.000000" upper="2.443461" effort="60.0" velocity="12.0"/>
+    <dynamics damping="0.05" friction="0.02"/>
+  </joint>
+  <joint name="rightElbow" type="revolute">
+    <origin xyz="-0.001563 -0.045312 -0.371875" rpy="0 0 0"/>
+    <parent link="upperArmR"/>
+    <child link="foreArmR"/>
+    <axis xyz="0 -1 0"/>
+    <limit lower="0.000000" upper="2.443461" effort="60.0" velocity="12.0"/>
+    <dynamics damping="0.05" friction="0.02"/>
+  </joint>
+  <joint name="leftKnee" type="revolute">
+    <origin xyz="0.000000 -0.012500 -0.543750" rpy="0 0 0"/>
+    <parent link="thighL"/>
+    <child link="shinL"/>
+    <axis xyz="0 -1 0"/>
+    <limit lower="-2.443461" upper="0.000000" effort="200.0" velocity="12.0"/>
+    <dynamics damping="0.05" friction="0.02"/>
+  </joint>
+  <joint name="rightKnee" type="revolute">
+    <origin xyz="0.000000 0.012500 -0.543750" rpy="0 0 0"/>
+    <parent link="thighR"/>
+    <child link="shinR"/>
+    <axis xyz="0 -1 0"/>
+    <limit lower="-2.443461" upper="0.000000" effort="200.0" velocity="12.0"/>
+    <dynamics damping="0.05" friction="0.02"/>
+  </joint>
+  <joint name="leftShoulder" type="revolute">
+    <origin xyz="0.000000 0.212500 0.648438" rpy="0 0 0"/>
+    <parent link="torso"/>
+    <child link="upperArmL"/>
+    <axis xyz="0 -1 0"/>
+    <limit lower="-1.570796" upper="1.570796" effort="80.0" velocity="12.0"/>
+    <dynamics damping="0.05" friction="0.02"/>
+  </joint>
+  <joint name="rightShoulder" type="revolute">
+    <origin xyz="0.000000 -0.212500 0.648438" rpy="0 0 0"/>
+    <parent link="torso"/>
+    <child link="upperArmR"/>
+    <axis xyz="0 -1 0"/>
+    <limit lower="-1.570796" upper="1.570796" effort="80.0" velocity="12.0"/>
+    <dynamics damping="0.05" friction="0.02"/>
+  </joint>
+  <joint name="leftHip" type="revolute">
+    <origin xyz="0.000000 0.150000 0.214062" rpy="0 0 0"/>
+    <parent link="pelvis"/>
+    <child link="thighL"/>
+    <axis xyz="0 -1 0"/>
+    <limit lower="-0.698132" upper="1.745329" effort="250.0" velocity="12.0"/>
+    <dynamics damping="0.05" friction="0.02"/>
+  </joint>
+  <joint name="rightHip" type="revolute">
+    <origin xyz="0.000000 -0.150000 0.214062" rpy="0 0 0"/>
+    <parent link="pelvis"/>
+    <child link="thighR"/>
+    <axis xyz="0 -1 0"/>
+    <limit lower="-0.698132" upper="1.745329" effort="250.0" velocity="12.0"/>
+    <dynamics damping="0.05" friction="0.02"/>
+  </joint>
+  <joint name="neck" type="revolute">
+    <origin xyz="0.001563 0.000000 0.735938" rpy="0 0 0"/>
+    <parent link="torso"/>
+    <child link="head"/>
+    <axis xyz="0 -1 0"/>
+    <limit lower="-0.610865" upper="0.610865" effort="40.0" velocity="12.0"/>
+    <dynamics damping="0.05" friction="0.02"/>
+  </joint>
+</robot>

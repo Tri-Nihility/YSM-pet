@@ -1,0 +1,239 @@
+{
+  "joint_order": [
+    "leftElbow",
+    "rightElbow",
+    "leftKnee",
+    "rightKnee",
+    "leftShoulder",
+    "rightShoulder",
+    "leftHip",
+    "rightHip",
+    "neck"
+  ],
+  "joint_bones": [
+    "LeftForeArm",
+    "RightForeArm",
+    "LeftLowerLeg",
+    "RightLowerLeg",
+    "LeftArm",
+    "RightArm",
+    "LeftLeg",
+    "RightLeg",
+    "AllHead"
+  ],
+  "stand_height_blocks": 1.0609,
+  "sole_y": 0.0016,
+  "total_mass_kg": 51.8,
+  "segments": [
+    {
+      "segment": "pelvis",
+      "parent": null,
+      "root_bone": "AllBody",
+      "bones": 12,
+      "volume_blk3": 0.0,
+      "mass_kg": 10.0,
+      "aabb": null
+    },
+    {
+      "segment": "torso",
+      "parent": "pelvis",
+      "root_bone": "UpperBody",
+      "bones": 46,
+      "volume_blk3": 0.4629,
+      "mass_kg": 15.5,
+      "aabb": [
+        [
+          -0.379,
+          0.803,
+          -0.218
+        ],
+        [
+          0.379,
+          2.016,
+          0.209
+        ]
+      ]
+    },
+    {
+      "segment": "head",
+      "parent": "torso",
+      "root_bone": "AllHead",
+      "bones": 240,
+      "volume_blk3": 1.1506,
+      "mass_kg": 4.3,
+      "aabb": [
+        [
+          -0.737,
+          0.63,
+          -0.433
+        ],
+        [
+          0.737,
+          2.672,
+          0.74
+        ]
+      ]
+    },
+    {
+      "segment": "upperArmL",
+      "parent": "torso",
+      "root_bone": "LeftArm",
+      "bones": 3,
+      "volume_blk3": 0.0298,
+      "mass_kg": 1.5,
+      "aabb": [
+        [
+          -0.308,
+          1.525,
+          -0.12
+        ],
+        [
+          -0.148,
+          1.938,
+          0.12
+        ]
+      ]
+    },
+    {
+      "segment": "foreArmL",
+      "parent": "upperArmL",
+      "root_bone": "LeftForeArm",
+      "bones": 8,
+      "volume_blk3": 0.0619,
+      "mass_kg": 1.1,
+      "aabb": [
+        [
+          -0.394,
+          1.084,
+          -0.141
+        ],
+        [
+          -0.12,
+          1.597,
+          0.142
+        ]
+      ]
+    },
+    {
+      "segment": "upperArmR",
+      "parent": "torso",
+      "root_bone": "RightArm",
+      "bones": 3,
+      "volume_blk3": 0.0298,
+      "mass_kg": 1.5,
+      "aabb": [
+        [
+          0.148,
+          1.525,
+          -0.12
+        ],
+        [
+          0.308,
+          1.938,
+          0.12
+        ]
+      ]
+    },
+    {
+      "segment": "foreArmR",
+      "parent": "upperArmR",
+      "root_bone": "RightForeArm",
+      "bones": 6,
+      "volume_blk3": 0.0619,
+      "mass_kg": 1.1,
+      "aabb": [
+        [
+          0.12,
+          1.084,
+          -0.141
+        ],
+        [
+          0.394,
+          1.597,
+          0.142
+        ]
+      ]
+    },
+    {
+      "segment": "thighL",
+      "parent": "pelvis",
+      "root_bone": "LeftLeg",
+      "bones": 1,
+      "volume_blk3": 0.0321,
+      "mass_kg": 5.2,
+      "aabb": [
+        [
+          -0.252,
+          0.745,
+          -0.125
+        ],
+        [
+          -0.023,
+          1.308,
+          0.125
+        ]
+      ]
+    },
+    {
+      "segment": "shinL",
+      "parent": "thighL",
+      "root_bone": "LeftLowerLeg",
+      "bones": 2,
+      "volume_blk3": 0.0721,
+      "mass_kg": 3.2,
+      "aabb": [
+        [
+          -0.258,
+          0.002,
+          -0.316
+        ],
+        [
+          -0.016,
+          0.85,
+          0.142
+        ]
+      ]
+    },
+    {
+      "segment": "thighR",
+      "parent": "pelvis",
+      "root_bone": "RightLeg",
+      "bones": 1,
+      "volume_blk3": 0.0321,
+      "mass_kg": 5.2,
+      "aabb": [
+        [
+          0.023,
+          0.745,
+          -0.125
+        ],
+        [
+          0.252,
+          1.308,
+          0.125
+        ]
+      ]
+    },
+    {
+      "segment": "shinR",
+      "parent": "thighR",
+      "root_bone": "RightLowerLeg",
+      "bones": 2,
+      "volume_blk3": 0.0721,
+      "mass_kg": 3.2,
+      "aabb": [
+        [
+          0.016,
+          0.002,
+          -0.316
+        ],
+        [
+          0.258,
+          0.85,
+          0.142
+        ]
+      ]
+    }
+  ],
+  "use_native_animation": false
+}

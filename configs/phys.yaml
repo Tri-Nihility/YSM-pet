@@ -1,0 +1,86 @@
+# 物理与训练课程配置（阶段 4）
+#
+# 重力：pybullet 为 Z-up，所以重力向量是 (0, 0, -g)。
+# 模型空间（Y-up, 前=-Z, 右=+X）→ pybullet 空间（Z-up, 前=+X, 上=+Z）的
+# 旋转矩阵 P（det=+1，保手性）：
+#     pb = P @ model，   P = [[0,0,-1],[-1,0,0],[0,1,0]]
+#   即  px = -mz (前)   py = -mx (右→-Y)   pz = my (上)
+
+gravity: -9.81                  # m/s^2，沿 pybullet 的 -Z
+meters_per_block: 1.0
+sim_hz: 120                     # 物理子步频率（120 已足够稳定，速度优先）
+control_hz: 30                  # 控制频率（= 一次决策保持 4 个子步）
+frame_skip: 4                   # sim_hz / control_hz
+
+# 地面
+ground:
+  friction: 0.9
+  restitution: 0.0
+
+# PD 位置控制（pybullet 的 POSITION_CONTROL 实际是带力矩上限的 PD）
+actuator:
+  mode: torque_pd               # 用 p.setJointMotorControl2(POSITION_CONTROL)
+  position_gain: 0.45           # 归一化到关节限位范围后的增益
+  velocity_gain: 0.12
+  max_velocity: 8.0             # rad/s
+  action_scale: 1.0             # 动作 = 归一化目标角 ∈ [-1,1] → 映射到 limits
+
+# ------------------------------------------------------------
+# 课程（curriculum）
+# ------------------------------------------------------------
+curriculum:
+  - name: stand                 # 第一步：学会站立
+    episode_seconds: 6.0
+    target_height_ratio: 0.92   # 髋部高度 / 站立参考高度，低于此值算倒下
+    max_tilt_deg: 45.0          # 躯干倾角超过此值算倒下
+    foot_contact_required: 2
+    rewards:
+      alive: 1.0
+      height: 3.0
+      upright: 2.5
+      com_over_feet: 1.5
+      joint_speed: -0.02
+      action_smooth: -0.01
+      torque: -0.002
+      fallen_penalty: -20.0
+    init_pose_jitter: 0.10      # 初始关节角抖动（归一化单位）
+
+  - name: walk                  # 第二步：学会走路
+    episode_seconds: 12.0
+    target_speed: 1.1           # m/s，目标前进速度（+X 方向）
+    target_height_ratio: 0.80
+    max_tilt_deg: 55.0
+    rewards:
+      alive: 0.6
+      forward_vel: 4.0          # min(v, target) 形式，避免刷爆
+      height: 1.5
+      upright: 1.5
+      contact_alternation: 0.8  # 左右脚交替触地
+      joint_speed: -0.02
+      action_smooth: -0.01
+      torque: -0.003
+      fallen_penalty: -10.0
+    init_pose_jitter: 0.08
+    # 从站立阶段继承权重，再继续训练
+    warmstart_from: stand
+
+# 观测（相对 pelvis 局部坐标系）
+observation:
+  include:
+    - pelvis_height             # 1
+    - pelvis_linear_vel         # 3（局部）
+    - pelvis_angular_vel        # 3（局部）
+    - torso_up_vector           # 3（躯干 +Y 在世界系的方向）
+    - joint_positions           # 9（归一化到 [-1,1]）
+    - joint_velocities          # 9（/max_velocity）
+    - foot_contacts             # 2
+    - previous_action           # 9
+  # walk 阶段额外：stage2 会把 target_speed 常量拼在末尾
+  walk_extra: [target_speed]     # 1
+
+# 随机化（提升鲁棒性，CPU 训练量小，先保守）
+domain_randomization:
+  enabled: true
+  mass_scale: [0.9, 1.1]
+  friction: [0.7, 1.0]
+  initial_push: 0.15            #  pelvis 线速度扰动（m/s）
