@@ -4,7 +4,11 @@ from PyInstaller.utils.hooks import collect_dynamic_libs
 from PyInstaller.utils.hooks import collect_submodules
 from PyInstaller.utils.hooks import collect_all
 
-datas = [('models', 'models'), ('configs', 'configs'), ('data/processed', 'data/processed')]
+# ⚠️ 这里列的目录必须**真的存在且非空**：git 不跟踪空目录，若某天被清空，
+#    CI 检出后它就不复存在，PyInstaller 会直接报
+#   `ERROR: Unable to find ... when adding binary and data files.` 并失败。
+#   （v0.3.0 踩过：`models/` 里的 URDF 属于训练线，删掉后目录变空，就挂在这里。）
+datas = [('configs', 'configs'), ('data/processed', 'data/processed')]
 # 原生加速 DLL：进 _internal/native（冻结后 ROOT 的两种解析结果都覆盖，
 # 见文件末尾的「补齐 exe 同级资源」步骤）。
 datas += [('native/raster.dll', 'native'),
@@ -97,7 +101,7 @@ import os as _os
 import shutil as _shutil
 
 _APP = _os.path.join(DISTPATH, 'YSM-pet')
-for _rel in ('configs', 'models', _os.path.join('data', 'processed')):
+for _rel in ('configs', _os.path.join('data', 'processed')):
     _src = _os.path.join(SPECPATH, _rel)
     if _os.path.isdir(_src):
         _shutil.copytree(_src, _os.path.join(_APP, _rel), dirs_exist_ok=True)
@@ -107,4 +111,4 @@ for _dll in ('raster.dll', 'ysmcrypt.dll', 'ysmreader.dll'):
         _dst = _os.path.join(_APP, 'native', _dll)
         _os.makedirs(_os.path.dirname(_dst), exist_ok=True)
         _shutil.copy2(_src, _dst)
-print('[spec] 已把 configs/ models/ data/processed/ native/*.dll 复制到 exe 同级目录: %s' % _APP)
+print('[spec] 已把 configs/ data/processed/ native/*.dll 复制到 exe 同级目录: %s' % _APP)
