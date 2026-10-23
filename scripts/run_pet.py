@@ -50,6 +50,9 @@ def main():
     ap.add_argument("--legacy", action="store_true",
                     help="强制用纯 Python 解析/解密（A5 回退开关，排查问题时用）")
     ap.add_argument("--smoke", action="store_true")
+    ap.add_argument("--self-check", action="store_true",
+                    help="依赖自检：import 全部关键模块后退出，不启动桌宠"
+                         "（CI 冒烟用；漏打包的模块在这里现形）")
     ap.add_argument("--frames", type=int, default=3)
     ap.add_argument("--all-parts", dest="all_parts", action="store_true",
                     help="冒烟时连特效/立绘/UI 部件一起画（默认「清晰模式」"
@@ -68,6 +71,39 @@ def main():
 
     if args.gaze:
         S.update(gaze_enabled=True)
+
+    # ---------------------------------------------------------- 依赖自检
+    # v0.3.0 事故：zstandard 没进打包产物，加密模型一加载就
+    # ModuleNotFoundError，而 --help 冒烟根本碰不到这条路径。
+    # 这个模式把「函数内 import」的关键模块全部真 import 一遍，
+    # 漏打包在 CI 阶段就炸，不会拖到用户机器上。
+    if args.self_check:
+        import importlib
+        mods = [
+            "numpy", "scipy", "scipy.spatial", "PIL", "PIL.Image",
+            "yaml", "tqdm", "py7zr",
+            "zstandard",                    # 加密 .ysm 的 zstd 解压（事故主角）
+            "pet.settings", "pet.modelsource", "pet.fastrender", "pet.petapp",
+            "ysm.ysmcrypt", "ysm.ysmbin", "ysm.nativeload",
+        ]
+        bad = []
+        for m in mods:
+            try:
+                importlib.import_module(m)
+            except Exception as e:         # noqa: BLE001
+                bad.append((m, e))
+        for m, e in bad:
+            print("  ✗ %-18s %s: %s" % (m, type(e).__name__, e))
+        if bad:
+            print("自检失败：%d 个模块 import 不了（打包漏东西了）" % len(bad))
+            return 1
+        print("自检通过：%d 个关键模块全部可 import" % len(mods))
+        # 软提示：py7zr 解 zstd 压缩的 7z 用的可选后端，缺了不崩
+        try:
+            importlib.import_module("backports.zstd")
+        except ImportError:
+            print("  （提示）缺 backports.zstd：zstd 压缩的 7z 模型包将打不开")
+        return 0
 
     # ---------------------------------------------------------- 冒烟自检
     if args.smoke:

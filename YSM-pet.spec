@@ -8,7 +8,9 @@ from PyInstaller.utils.hooks import collect_all
 #    CI 检出后它就不复存在，PyInstaller 会直接报
 #   `ERROR: Unable to find ... when adding binary and data files.` 并失败。
 #   （v0.3.0 踩过：`models/` 里的 URDF 属于训练线，删掉后目录变空，就挂在这里。）
-datas = [('configs', 'configs'), ('data/processed', 'data/processed')]
+#   data/processed 只是个 .gitkeep 占位（代码零引用），不进产物——
+#   发布包只包含程序本体：exe + _internal + configs + native。
+datas = [('configs', 'configs')]
 # 原生加速 DLL：进 _internal/native（冻结后 ROOT 的两种解析结果都覆盖，
 # 见文件末尾的「补齐 exe 同级资源」步骤）。
 datas += [('native/raster.dll', 'native'),
@@ -26,7 +28,22 @@ hiddenimports = ['pet.petapp', 'pet.modelsource', 'pet.settings',
                  # .7z 解包（pet/modelsource.py 里是函数内 import）：
                  # 打包环境**必须装了 py7zr**，否则它只是静默降级到
                  # libarchive（Windows 自带 tar.exe），不够稳。
-                 'py7zr', 'multivolumefile', 'texttable', 'pyzstd']
+                 # 注意：py7zr≥1.1 的 zstd 支持走 `compression.zstd`(3.14+)
+                 # 或 `backports.zstd`，**不是** pyzstd（v0.3.0 的 spec 列过
+                 # pyzstd，那个包根本不在依赖链里，纯属死条目）。
+                 'py7zr', 'multivolumefile', 'texttable']
+# 加密格式 .ysm 的 zstd 解压（ysmcrypt.py 函数内 import zstandard）：
+# v0.3.0 漏了它 → 用户一加载加密模型就 ModuleNotFoundError。
+# collect_all 把包目录 + backend_c/_cffi 两个 C 扩展一起收进来。
+tmp_ret = collect_all('zstandard')
+datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
+# py7zr 解 zstd 压缩的 7z 用（可选；没装只是不支持该压缩法，不崩）。
+# requirements.txt 已列 backports.zstd，正常情况下能收到。
+try:
+    tmp_ret = collect_all('backports.zstd')
+    datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
+except Exception:
+    pass
 # ⚠️ 打包依赖必须与 requirements.txt 对齐。**不要**把 torch / pybullet 拉进来：
 #    * torch 是训练线遗产，桌宠一行都不用，带上会让产物从 ~200MB 膨胀到 ~2GB；
 #    * pybullet 只为两个矩阵函数服务，已被 `src/pet/camera.py`（纯 numpy）取代，
@@ -101,7 +118,9 @@ import os as _os
 import shutil as _shutil
 
 _APP = _os.path.join(DISTPATH, 'YSM-pet')
-for _rel in ('configs', _os.path.join('data', 'processed')):
+# 只补程序运行必需的资源：configs（joints9.yaml）+ native 三个 DLL。
+# 不放 data/（空占位）、models/、docs/ 等任何非程序内容。
+for _rel in ('configs',):
     _src = _os.path.join(SPECPATH, _rel)
     if _os.path.isdir(_src):
         _shutil.copytree(_src, _os.path.join(_APP, _rel), dirs_exist_ok=True)

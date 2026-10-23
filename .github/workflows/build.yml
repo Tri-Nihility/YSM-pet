@@ -72,10 +72,14 @@ jobs:
 
       # 有没有模型都得能启动：--help 会走完 argparse，能验证打包出来的
       # Python 运行时 + 依赖打包完整（漏东西在这里就崩了，不会拖到 Release）。
-      - name: 冒烟（ --help ）
+      # --self-check 更进一步：把函数内 import 的关键模块（zstandard 等）
+      # 全部真 import 一遍 —— v0.3.0 就是漏了 zstandard，--help 冒烟碰不到
+      # 那条路径，用户一加载加密模型才崩。
+      - name: 冒烟（ --help + --self-check ）
         shell: bash
         run: |
           ./dist/YSM-pet/YSM-pet.exe --help
+          ./dist/YSM-pet/YSM-pet.exe --self-check
 
       - name: 压缩 Release 包
         shell: pwsh
@@ -84,6 +88,32 @@ jobs:
           $zip = "out/YSM-pet-${{ steps.ver.outputs.ver }}-win64.zip"
           Compress-Archive -Path "dist/YSM-pet/*" -DestinationPath $zip
           Get-Item $zip | Select-Object Name, @{n='MB';e={[math]::Round($_.Length/1MB,1)}}
+
+      # 发布包纯度：只允许程序本体（exe + _internal + configs + native），
+      # 打包过程产物（build/、日志、.spec、__pycache__…）一律不许进去。
+      - name: 校验发布包只含程序本体
+        shell: bash
+        run: |
+          python - <<'PYEOF'
+          import sys, zipfile
+          z = zipfile.ZipFile("out/YSM-pet-${{ steps.ver.outputs.ver }}-win64.zip")
+          names = z.namelist()
+          tops = sorted(set(n.split('/')[0] for n in names if n.split('/')[0]))
+          allowed = {'YSM-pet.exe', '_internal', 'configs', 'native'}
+          extra = [t for t in tops if t not in allowed]
+          missing = [t for t in allowed if t not in tops]
+          bad = [n for n in names if '__pycache__' in n or n.endswith(('.pdb', '.log', '.spec'))]
+          print('顶层条目:', tops)
+          if extra:
+              print('✗ 发布包混入非程序内容:', extra); sys.exit(1)
+          if missing:
+              print('✗ 发布包缺程序本体:', missing); sys.exit(1)
+          if bad:
+              print('✗ 发布包混入打包过程产物:', bad[:5]); sys.exit(1)
+          if not any('zstandard' in n for n in names):
+              print('✗ _internal 里没有 zstandard（加密模型会加载失败）'); sys.exit(1)
+          print('发布包纯度 OK：仅程序本体，且 zstandard 已内置')
+          PYEOF
 
       - name: 上传构建产物
         uses: actions/upload-artifact@v4

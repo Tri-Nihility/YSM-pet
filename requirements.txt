@@ -7,6 +7,12 @@
 #   tqdm         进度条
 #   Pillow       贴图处理
 #   py7zr        .7z 格式的模型压缩包（缺少会静默降级到系统 tar，不够稳）
+#   zstandard   **加密格式 .ysm 的 zstd 解压**（ysmcrypt.decrypt_ysm_file 走它）。
+#                漏了它在源码环境不报错（py7zr 不会带它进来），但 PyInstaller
+#                按 requirements+import 分析，漏列 → 打包版一加载加密模型就是
+#                ModuleNotFoundError: No module named 'zstandard'（v0.3.0 事故）。
+#   backports.zstd  py7zr≥1.1 解 zstd 压缩的 7z 时需要（Python<3.14 的
+#                compression.zstd 替代）。缺了只影响 zstd 压缩的 7z 模型包。
 #   PyInstaller  仅本地打包 exe 时需要（CI 里另行安装）
 #
 # ⚠️ 已从旧版 YSM-Motion 移除的两个依赖，别再捡回来：
@@ -25,3 +31,5 @@ pyyaml
 tqdm
 Pillow
 py7zr
+zstandard
+backports.zstd

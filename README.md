@@ -64,7 +64,7 @@ python -m PyInstaller YSM-pet.spec --noconfirm --clean
 推送 tag 后 GitHub Actions 会自动构建 Windows 版并挂到 Release 上：
 
 ```bash
-git tag v0.3.0 && git push origin v0.3.0
+git tag v0.3.1 && git push origin v0.3.1
 ```
 
 ---
