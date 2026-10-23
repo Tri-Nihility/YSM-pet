@@ -134,7 +134,7 @@ for _dll in ('raster.dll', 'ysmcrypt.dll', 'ysmreader.dll'):
 #    当前控制台编码。GitHub Actions 的 windows runner 默认是 cp1252，
 #    中文一 print 就是 UnicodeEncodeError: 'charmap' codec can't encode
 #    —— v0.3.0 第一次 CI 就栽在这里（包其实已经打好了，是最后的提示信息炸的）。
-_msg = '[spec] copied configs/ data/processed/ native/*.dll next to the exe: %s' % _APP
+_msg = '[spec] copied configs/ native/*.dll next to the exe: %s' % _APP
 try:
     print(_msg)
 except UnicodeEncodeError:                       # 兜底：绝不因打印失败整个构建
