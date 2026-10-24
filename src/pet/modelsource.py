@@ -36,7 +36,7 @@ import sys
 import tempfile
 import time
 
-ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from apppath import source_sys_path, writable_root
 
 # 支持的模型文件扩展名
 MODEL_EXTS = (".ysm", ".bin")
@@ -55,13 +55,14 @@ BSDTAR_CANDIDATES = (
 
 
 def _sys_path():
-    for p in (ROOT, os.path.join(ROOT, "src")):
+    for p in source_sys_path():
         if p not in sys.path:
             sys.path.insert(0, p)
 
 
 def cache_dir():
-    d = os.path.join(ROOT, "data", "cache")
+    # 可写目录：冻结态优先 exe 同级（缓存跟着程序走），见 apppath 模块文档
+    d = os.path.join(writable_root(), "data", "cache")
     os.makedirs(d, exist_ok=True)
     return d
 

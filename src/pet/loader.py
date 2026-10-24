@@ -12,12 +12,12 @@ import os
 import numpy as np
 from PIL import Image
 
-ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from apppath import resource_root, source_sys_path, writable_root
 
 
 def _sys_path():
     import sys
-    for p in (ROOT, os.path.join(ROOT, "src")):
+    for p in source_sys_path():
         if p not in sys.path:
             sys.path.insert(0, p)
 
@@ -28,7 +28,7 @@ def load_model(model_file="亚托莉目标模型.bin", decrypted_dir=None):
     from ysm import ysmbin as B
     from ysm import ysmmodel as YM
 
-    d = decrypted_dir or os.path.join(ROOT, "data", "decrypted")
+    d = decrypted_dir or os.path.join(writable_root(), "data", "decrypted")
     path = model_file if os.path.isabs(model_file) else os.path.join(d, model_file)
     with open(path, "rb") as fp:
         raw = B.deserialize(fp.read())
@@ -76,14 +76,14 @@ def load_texture(raw=None, tex_png=None, prefer_embedded=True):
             arr, kind = _decode_image(tex["data"], tex.get("width", 0),
                                       tex.get("height", 0))
             return arr, "内嵌:%s(%s)" % (tex.get("name"), kind)
-    path = tex_png or os.path.join(ROOT, "outputs", "step4", "tex.png")
+    path = tex_png or os.path.join(writable_root(), "outputs", "step4", "tex.png")
     return np.asarray(Image.open(path).convert("RGBA"), np.uint8), path
 
 
 def load_hide_bones(cfg_path=None):
     _sys_path()
     import yaml
-    cfg_path = cfg_path or os.path.join(ROOT, "configs", "joints9.yaml")
+    cfg_path = cfg_path or os.path.join(resource_root(), "configs", "joints9.yaml")
     with open(cfg_path, encoding="utf-8") as fp:
         cfg = yaml.safe_load(fp)
     return list(cfg.get("hide_bones", [])), cfg

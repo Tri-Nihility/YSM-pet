@@ -8,6 +8,7 @@
     python scripts/run_pet.py --gaze                    # 启动即开启视线追踪
     python scripts/run_pet.py --smoke                   # 不开窗口，只渲 3 帧存图自检
     python scripts/run_pet.py --reset                   # 忘掉记住的模型，重新走向导
+    python scripts/run_pet.py --self-check --out x.log  # 依赖自检，输出同时写日志
 """
 import argparse
 import os
@@ -29,9 +30,118 @@ for _s in (sys.stdout, sys.stderr):
     except Exception:                                        # noqa: BLE001
         pass
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, ROOT)
-sys.path.insert(0, os.path.join(ROOT, "src"))
+
+# ⚠️ windowed 打包（console=False）没有控制台，解释器初始化时拿不到
+#    stdout/stderr，sys.stdout / sys.stderr 会是 None —— 此后任何 print()
+#    都是 RuntimeError: lost sys.stdout，而桌宠 GUI 路径满屏诊断输出
+#    （petapp 启动时就打十几行：模型/面数/取景/待机策略…），不补空流
+#    等于双击 exe 立刻闪退。补成「黑洞流」；有 --out 时下面的 tee 会
+#    再包一层，把输出写进日志文件。
+class _NullStream:
+    def write(self, s):
+        pass
+
+    def flush(self):
+        pass
+
+
+if sys.stdout is None:
+    sys.stdout = _NullStream()
+if sys.stderr is None:
+    sys.stderr = _NullStream()
+
+
+# 仅源码模式需要手动补 sys.path（冻结态 PyInstaller 已处理好导入）。
+# 注意：不能再像以前那样无条件用 dirname×2 推仓库根 —— onefile 冻结时脚本在
+# %TEMP%/_MEIxxxx 里，推出来是临时目录，详见 apppath 模块文档。
+if not getattr(sys, "frozen", False):
+    _HERE = os.path.dirname(os.path.abspath(__file__))
+    _ROOT = os.path.dirname(_HERE)                      # scripts/ → 仓库根
+    for _p in (_ROOT, os.path.join(_ROOT, "src")):
+        if _p not in sys.path:
+            sys.path.insert(0, _p)
+
+from apppath import writable_root
+
+
+def _install_out_tee():
+    """`--out 文件`：把 stdout/stderr 的全部输出 tee 一份到日志文件。
+
+    为什么需要：v0.3.2 起 spec 改成 `console=False`（windowed，去掉黑色
+    命令行窗口），windowed 程序没有控制台，`print()` 直接丢弃、CI 也抓不到
+    输出。CLI 模式（--help/--self-check/--smoke）靠这个参数留痕：
+      * CI 冒烟：`--self-check --out check.log` 再 grep 日志；
+      * 用户 double-click 带参数排查时也有据可查。
+    必须在 argparse 之前调用（--help 的输出也走 stdout）。
+    """
+    out_path = None
+    argv = sys.argv[1:]
+    for i, a in enumerate(argv):
+        if a == "--out" and i + 1 < len(argv):
+            out_path = argv[i + 1]
+        elif a.startswith("--out="):
+            out_path = a.split("=", 1)[1]
+    if not out_path:
+        return
+
+    class _Tee:
+        def __init__(self, *streams):
+            self._streams = [s for s in streams if s is not None]
+
+        def write(self, s):
+            for st in self._streams:
+                try:
+                    st.write(s)
+                except Exception:                            # noqa: BLE001
+                    pass
+
+        def flush(self):
+            for st in self._streams:
+                try:
+                    st.flush()
+                except Exception:                            # noqa: BLE001
+                    pass
+
+    try:
+        f = open(out_path, "w", encoding="utf-8", errors="replace")
+    except OSError:
+        return
+    sys.stdout = _Tee(sys.stdout, f)
+    sys.stderr = _Tee(sys.stderr, f)
+
+
+_install_out_tee()
+
+
+def _crash_log_path():
+    return os.path.join(writable_root(), "outputs", "crash.log")
+
+
+def _excepthook(et, ev, tb):
+    """windowed 打包下用户眼前一黑什么都看不见 —— 崩溃必须留痕 + 弹窗。"""
+    import traceback
+    try:
+        p = _crash_log_path()
+        os.makedirs(os.path.dirname(p), exist_ok=True)
+        with open(p, "a", encoding="utf-8") as fp:
+            fp.write("---- %s ----\n" % time.strftime("%Y-%m-%d %H:%M:%S"))
+            traceback.print_exception(et, ev, tb, file=fp)
+    except Exception:                                        # noqa: BLE001
+        pass
+    if sys.stderr is not None:                # 有控制台时也打一份（源码模式）
+        try:
+            traceback.print_exception(et, ev, tb)
+        except Exception:                                    # noqa: BLE001
+            pass
+    try:
+        import ctypes
+        ctypes.windll.user32.MessageBoxW(
+            0,
+            "YSM-pet 启动失败。\n详情已写入：\n%s\n"
+            "（看不到该文件的话，请把本窗口截图反馈）" % _crash_log_path(),
+            "YSM-pet", 0x10)
+    except Exception:                                        # noqa: BLE001
+        pass
 
 
 def main():
@@ -54,6 +164,10 @@ def main():
                     help="依赖自检：import 全部关键模块后退出，不启动桌宠"
                          "（CI 冒烟用；漏打包的模块在这里现形）")
     ap.add_argument("--frames", type=int, default=3)
+    ap.add_argument("--out", default=None, metavar="日志文件",
+                    help="把命令行输出同时写到指定文件。打包版是 windowed"
+                         "（无黑色控制台），CI 冒烟和问题排查靠它留痕，"
+                         "如 --self-check --out check.log")
     ap.add_argument("--all-parts", dest="all_parts", action="store_true",
                     help="冒烟时连特效/立绘/UI 部件一起画（默认「清晰模式」"
                          "只画人物本体）")
@@ -127,7 +241,7 @@ def main():
         fr = FastRenderer(model, tex, hide_bones=hide)
         fr.lighting = args.lighting
         an = IdleAnimator(model)
-        out = os.path.join(ROOT, "outputs", "pet")
+        out = os.path.join(writable_root(), "outputs", "pet")
         os.makedirs(out, exist_ok=True)
         from PIL import Image
         W, H = int(200 * args.scale), int(300 * args.scale)
@@ -152,4 +266,5 @@ def main():
 
 
 if __name__ == "__main__":
+    sys.excepthook = _excepthook
     sys.exit(main())

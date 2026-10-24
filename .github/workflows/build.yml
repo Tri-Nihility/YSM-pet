@@ -60,37 +60,46 @@ jobs:
       - name: PyInstaller 打包
         run: python -m PyInstaller YSM-pet.spec --noconfirm --clean
 
+      # v0.3.2 起是 onefile 单文件：产物就是 dist/YSM-pet.exe 一个文件
+      #（依赖全在 exe 里，启动时解压到 %TEMP%/_MEIxxxx）。
       - name: 校验产物完整性
         shell: bash
         run: |
           set -e
-          test -f dist/YSM-pet/YSM-pet.exe || { echo "exe 没生成"; exit 1; }
-          test -f dist/YSM-pet/configs/joints9.yaml || { echo "configs 缺失"; exit 1; }
-          test -d dist/YSM-pet/_internal || { echo "_internal 缺失"; exit 1; }
-          du -sh dist/YSM-pet
-          echo "产物 OK"
+          test -f dist/YSM-pet.exe || { echo "exe 没生成"; exit 1; }
+          ls -lh dist/YSM-pet.exe
+          echo "产物 OK（onefile 单文件）"
 
       # 有没有模型都得能启动：--help 会走完 argparse，能验证打包出来的
       # Python 运行时 + 依赖打包完整（漏东西在这里就崩了，不会拖到 Release）。
       # --self-check 更进一步：把函数内 import 的关键模块（zstandard 等）
       # 全部真 import 一遍 —— v0.3.0 就是漏了 zstandard，--help 冒烟碰不到
       # 那条路径，用户一加载加密模型才崩。
+      # ⚠️ windowed 打包（console=False）没有控制台，stdout 直接丢弃，
+      #    所以每个模式都带 --out 把输出落日志文件，再读日志校验。
       - name: 冒烟（ --help + --self-check ）
         shell: bash
         run: |
-          ./dist/YSM-pet/YSM-pet.exe --help
-          ./dist/YSM-pet/YSM-pet.exe --self-check
+          set -e
+          ./dist/YSM-pet.exe --help --out help.log
+          grep -q "usage: YSM-pet.exe" help.log || { echo "--help 输出异常："; cat help.log; exit 1; }
+          cat help.log
+          ./dist/YSM-pet.exe --self-check --out selfcheck.log
+          grep -q "自检通过" selfcheck.log || { echo "自检未通过："; cat selfcheck.log; exit 1; }
+          cat selfcheck.log
 
       - name: 压缩 Release 包
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path out | Out-Null
           $zip = "out/YSM-pet-${{ steps.ver.outputs.ver }}-win64.zip"
-          Compress-Archive -Path "dist/YSM-pet/*" -DestinationPath $zip
+          Compress-Archive -Path "dist/YSM-pet.exe" -DestinationPath $zip
           Get-Item $zip | Select-Object Name, @{n='MB';e={[math]::Round($_.Length/1MB,1)}}
 
-      # 发布包纯度：只允许程序本体（exe + _internal + configs + native），
+      # 发布包纯度：onefile 之后 zip 里只允许有一个 YSM-pet.exe，
       # 打包过程产物（build/、日志、.spec、__pycache__…）一律不许进去。
+      # zstandard 是否进包由上面的 --self-check 真 import 保证（onefile 的
+      # 内容在 exe 里的 CArchive，没法像 onedir 那样列 _internal 清单）。
       - name: 校验发布包只含程序本体
         shell: bash
         run: |
@@ -99,20 +108,22 @@ jobs:
           z = zipfile.ZipFile("out/YSM-pet-${{ steps.ver.outputs.ver }}-win64.zip")
           names = z.namelist()
           tops = sorted(set(n.split('/')[0] for n in names if n.split('/')[0]))
-          allowed = {'YSM-pet.exe', '_internal', 'configs', 'native'}
+          allowed = {'YSM-pet.exe'}
           extra = [t for t in tops if t not in allowed]
           missing = [t for t in allowed if t not in tops]
           bad = [n for n in names if '__pycache__' in n or n.endswith(('.pdb', '.log', '.spec'))]
-          print('顶层条目:', tops)
+          print('zip 条目数:', len(names), '顶层:', tops)
           if extra:
               print('✗ 发布包混入非程序内容:', extra); sys.exit(1)
           if missing:
               print('✗ 发布包缺程序本体:', missing); sys.exit(1)
           if bad:
               print('✗ 发布包混入打包过程产物:', bad[:5]); sys.exit(1)
-          if not any('zstandard' in n for n in names):
-              print('✗ _internal 里没有 zstandard（加密模型会加载失败）'); sys.exit(1)
-          print('发布包纯度 OK：仅程序本体，且 zstandard 已内置')
+          size = z.getinfo('YSM-pet.exe').file_size
+          print('exe 解压后大小: %.1f MB' % (size / 1048576))
+          if size < 50 * 1048576:
+              print('✗ exe 太小（<50MB），依赖没打全'); sys.exit(1)
+          print('发布包纯度 OK：单文件 exe，zstandard 由 --self-check 把关')
           PYEOF
 
       - name: 上传构建产物

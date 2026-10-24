@@ -15,6 +15,8 @@ import ctypes
 import os
 import sys
 
+from apppath import resource_root
+
 _CACHE = {}
 
 
@@ -29,9 +31,8 @@ def disabled_modules():
 
 
 def _native_root():
-    # src/ysm/nativeload.py -> 仓库根
-    here = os.path.dirname(os.path.abspath(__file__))
-    return os.path.dirname(os.path.dirname(here))
+    # 冻结态（onedir/onefile）资源都在 sys._MEIPASS 里，见 apppath 模块文档
+    return resource_root()
 
 
 def load(name):

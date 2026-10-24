@@ -1,4 +1,6 @@
 # -*- mode: python ; coding: utf-8 -*-
+import os
+
 from PyInstaller.utils.hooks import collect_data_files
 from PyInstaller.utils.hooks import collect_dynamic_libs
 from PyInstaller.utils.hooks import collect_submodules
@@ -8,11 +10,11 @@ from PyInstaller.utils.hooks import collect_all
 #    CI 检出后它就不复存在，PyInstaller 会直接报
 #   `ERROR: Unable to find ... when adding binary and data files.` 并失败。
 #   （v0.3.0 踩过：`models/` 里的 URDF 属于训练线，删掉后目录变空，就挂在这里。）
-#   data/processed 只是个 .gitkeep 占位（代码零引用），不进产物——
-#   发布包只包含程序本体：exe + _internal + configs + native。
+#   data/processed 只是个 .gitkeep 占位（代码零引用），不进产物 ——
+#   v0.3.2 起是 onefile 单文件：整个 Release 就是一个 YSM-pet.exe。
 datas = [('configs', 'configs')]
-# 原生加速 DLL：进 _internal/native（冻结后 ROOT 的两种解析结果都覆盖，
-# 见文件末尾的「补齐 exe 同级资源」步骤）。
+# 原生加速 DLL：冻结后落在 sys._MEIPASS/native/（各模块经
+# src/apppath.py 的 resource_root() 定位，源码 / onedir / onefile 三态统一）。
 datas += [('native/raster.dll', 'native'),
           ('native/ysmcrypt.dll', 'native'),
           ('native/ysmreader.dll', 'native')]
@@ -24,6 +26,7 @@ binaries = []
 #   import numpy.f2py / numpy.testing，numpy.testing 又 import unittest。
 #   任一缺失 → scipy.spatial → scipy.sparse → scipy._lib._array_api 整条链崩。
 hiddenimports = ['pet.petapp', 'pet.modelsource', 'pet.settings',
+                 'apppath',
                  'numpy.f2py', 'numpy.testing', 'unittest',
                  # .7z 解包（pet/modelsource.py 里是函数内 import）：
                  # 打包环境**必须装了 py7zr**，否则它只是静默降级到
@@ -79,62 +82,47 @@ a = Analysis(
 )
 pyz = PYZ(a.pure)
 
+# ---------------------------------------------------------------- 打包形态
+# v0.3.2 起：onefile 单文件 + windowed（无黑色命令行窗口）。
+#
+# console=False：桌宠是纯 GUI 程序，以前 console=True 是为了让
+#   --help/--self-check/--smoke 能看到输出；现在这些 CLI 模式的输出统一走
+#   run_pet.py 的 `--out 日志文件` tee（windowed 没有控制台，print 会丢），
+#   CI 冒烟同步改成读日志。崩溃也留痕：run_pet.py 装了 excepthook，
+#   写 outputs/crash.log 并弹 MessageBox。
+#
+# onefile：a.binaries / a.datas 直接进 exe（不再走 COLLECT 的 onedir），
+#   启动时解压到 %TEMP%/_MEIxxxx 再运行。代价是每次启动多几秒；
+#   UPX 在这里关掉 —— onefile 的 CArchive 被 UPX 压过之后启动还要多一道
+#   解压，且 UPX 壳是杀软误报的经典特征，单文件分发得不偿失。
 exe = EXE(
     pyz,
     a.scripts,
-    [],
-    exclude_binaries=True,
+    a.binaries,
+    a.datas,
+    exclude_binaries=False,
     name='YSM-pet',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
-    console=True,
+    upx=False,
+    console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
 )
-coll = COLLECT(
-    exe,
-    a.binaries,
-    a.datas,
-    strip=False,
-    upx=True,
-    upx_exclude=[],
-    name='YSM-pet',
-)
-
-# ---------------------------------------------------------------- 资源补齐
-# 冻结后各模块的 ROOT 是「os.path.dirname 三连」（src/<pkg>/<mod>.py → 仓库根）。
-# 在 PyInstaller 里 __file__ = <_MEIPASS>/<pkg>/<mod>.pyc，所以 ROOT 会解析到
-# **exe 所在目录**（dist/YSM-pet/），而不是 _internal/；而 COLLECT 只会把
-# datas 放进 _internal/。实测只放 _internal 时启动即
-#   FileNotFoundError: '...\dist\YSM-pet\configs\joints9.yaml'
-# 所以这里把同一批资源再放一份到 exe 同级目录：两处都有，无论 ROOT 怎么解析
-# 都能找到（native/*.dll 同理，native 缺失只会静默降级成 Python 渲染）。
-import os as _os
-import shutil as _shutil
-
-_APP = _os.path.join(DISTPATH, 'YSM-pet')
-# 只补程序运行必需的资源：configs（joints9.yaml）+ native 三个 DLL。
-# 不放 data/（空占位）、models/、docs/ 等任何非程序内容。
-for _rel in ('configs',):
-    _src = _os.path.join(SPECPATH, _rel)
-    if _os.path.isdir(_src):
-        _shutil.copytree(_src, _os.path.join(_APP, _rel), dirs_exist_ok=True)
-for _dll in ('raster.dll', 'ysmcrypt.dll', 'ysmreader.dll'):
-    _src = _os.path.join(SPECPATH, 'native', _dll)
-    if _os.path.isfile(_src):
-        _dst = _os.path.join(_APP, 'native', _dll)
-        _os.makedirs(_os.path.dirname(_dst), exist_ok=True)
-        _shutil.copy2(_src, _dst)
-# ⚠️ 这一行必须是 ASCII：spec 是在 PyInstaller 进程里 exec 的，输出会打到
+# 没有 COLLECT —— onefile 产物就是 dist/YSM-pet.exe 一个文件。
+# 也没有「资源补到 exe 同级」的收尾复制了：各模块经 src/apppath.py 的
+# resource_root() 统一从 sys._MEIPASS 找 configs/ 和 native/*.dll，
+# onedir（_internal）和 onefile（临时解压目录）两种冻结态都覆盖。
+#
+# ⚠️ 下面的 print 必须是 ASCII：spec 是在 PyInstaller 进程里 exec 的，输出会打到
 #    当前控制台编码。GitHub Actions 的 windows runner 默认是 cp1252，
 #    中文一 print 就是 UnicodeEncodeError: 'charmap' codec can't encode
 #    —— v0.3.0 第一次 CI 就栽在这里（包其实已经打好了，是最后的提示信息炸的）。
-_msg = '[spec] copied configs/ native/*.dll next to the exe: %s' % _APP
+_msg = '[spec] onefile windowed build -> %s' % os.path.join(DISTPATH, 'YSM-pet.exe')
 try:
     print(_msg)
 except UnicodeEncodeError:                       # 兜底：绝不因打印失败整个构建

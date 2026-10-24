@@ -24,10 +24,11 @@ import os
 
 import numpy as np
 
+from apppath import resource_root
 from phys.bind import P_MAT
 
-ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-DLL = os.path.join(ROOT, "native", "raster.dll")
+# 冻结态（onedir/onefile）下资源都在 sys._MEIPASS 里，见 apppath 模块文档
+DLL = os.path.join(resource_root(), "native", "raster.dll")
 
 # 光照（pybullet 空间：+X = 角色前方, +Y = 左, +Z = 上）
 # 旧光向 [0.45,-0.60,0.66] 是「上方偏后」，导致脸发暗、且过半的面被 clamp 到同一个

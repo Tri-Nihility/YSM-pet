@@ -19,10 +19,11 @@ import time
 
 import numpy as np
 
+from apppath import source_sys_path
 from PySide6 import QtCore, QtGui, QtWidgets
 
-ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-for _p in (ROOT, os.path.join(ROOT, "src")):
+# 仅源码模式需要手动补 sys.path（冻结态 PyInstaller 已处理好导入）
+for _p in source_sys_path():
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
